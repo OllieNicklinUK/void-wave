@@ -1,0 +1,69 @@
+name: Build Void Wave
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+
+  # ── Windows: VST3 + Standalone + NSIS installer ────────────────────────────
+  build-windows:
+    name: Windows (VST3 + Installer)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Run NSIS
+        run: |
+          choco install nsis -y
+          cd installer
+          makensis VoidWave.nsi
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoidWave-Windows-Setup
+          path: installer/VoidWave-Setup.exe
+          retention-days: 30
+
+  # ── macOS: VST3 + AU + .pkg installer ─────────────────────────────────────
+  build-macos:
+    name: macOS (VST3 + AU)
+    runs-on: macos-14        # Apple Silicon runner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCOPY_PLUGIN_AFTER_BUILD=FALSE
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package VST3 + AU as zip
+        run: |
+          mkdir -p dist/VST3 dist/AU
+          cp -r "build/VoidWave_artefacts/Release/VST3/Void Wave.vst3" dist/VST3/
+          cp -r "build/VoidWave_artefacts/Release/AU/Void Wave.component" dist/AU/
+          cd dist && zip -r "../VoidWave-macOS.zip" .
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoidWave-macOS
+          path: VoidWave-macOS.zip
+          retention-days: 30

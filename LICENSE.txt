@@ -1,0 +1,5 @@
+Copyright (c) 2025 Void Audio
+
+All rights reserved.
+
+This software is provided for personal use only. Redistribution or resale is not permitted without written permission from Void Audio.
