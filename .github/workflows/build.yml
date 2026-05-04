@@ -29,6 +29,13 @@ jobs:
           choco install nsis -y
           & "C:\Program Files (x86)\NSIS\makensis.exe" /V4 installer\VoidWave.nsi
 
+      - name: Upload raw VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoidWave-Windows-VST3
+          path: build/VoidWave_artefacts/Release/VST3/Void Wave.vst3
+          retention-days: 30
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
