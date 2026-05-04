@@ -27,7 +27,7 @@ jobs:
       - name: Run NSIS
         run: |
           choco install nsis -y
-          & "C:\Program Files (x86)\NSIS\makensis.exe" installer\VoidWave.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /V4 installer\VoidWave.nsi
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
