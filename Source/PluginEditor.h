@@ -53,7 +53,10 @@ private:
     juce::TextButton     midiMapBtn { "MIDI MAP" };
     MidiLearnOverlay     midiLearnOverlay;
 
-    // Dev auto-play
+    // Save preset
+    juce::TextButton saveBtn { "SAVE" };
+
+    // Auto-play (standalone only)
     juce::TextButton autoPlayBtn { "AUTO" };
     juce::Label      noteLabel;
 
@@ -62,6 +65,7 @@ private:
     void onCategoryChanged();              // catCombo changed
     void onPresetSelected();               // presetCombo changed
     void updatePresetDisplay();            // sync combos to currentIndex
+    void onSavePreset();                   // save current params as named preset
     static juce::String midiNoteToName(int note);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoidWaveAudioProcessorEditor)

@@ -219,12 +219,33 @@ bool PresetManager::loadPreset(int index)
 
 bool PresetManager::savePreset(const juce::String& name, const juce::String& category)
 {
-    juce::File folder = getUserPresetFolder().getChildFile(category);
+    juce::File folder = getUserPresetFolder().getChildFile(category.toUpperCase());
     if (!folder.createDirectory()) return false;
-    juce::File file = folder.getChildFile(name + ".vwpreset");
-    auto state = apvts.copyState();
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    return xml && xml->writeTo(file);
+
+    // Write in <Parameters attr="val" .../> format — same as factory presets.
+    juce::XmlElement root("Parameters");
+    root.setAttribute("_name",     name);
+    root.setAttribute("_category", category.toUpperCase());
+    root.setAttribute("_sub",      "USER");
+
+    // Write every APVTS parameter as an attribute with its actual (un-normalised) value.
+    for (auto* param : apvts.processor.getParameters())
+    {
+        if (auto* p = dynamic_cast<juce::RangedAudioParameter*>(param))
+        {
+            float actual = p->convertFrom0to1(p->getValue());
+            // Match int vs float serialisation
+            if (dynamic_cast<juce::AudioParameterInt*>(param) ||
+                dynamic_cast<juce::AudioParameterChoice*>(param) ||
+                dynamic_cast<juce::AudioParameterBool*>(param))
+                root.setAttribute(p->paramID, (int) std::round(actual));
+            else
+                root.setAttribute(p->paramID, (double) actual);
+        }
+    }
+
+    juce::File file = folder.getChildFile(name.replace(" ", "_") + ".vwpreset");
+    return root.writeTo(file);
 }
 
 void PresetManager::nextPreset()

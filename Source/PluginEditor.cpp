@@ -151,23 +151,35 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     midiLearnOverlay.setVisible(false);
     addAndMakeVisible(midiLearnOverlay);
 
-    // Auto-play
+    // Save preset button
+    saveBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
+    saveBtn.setColour(juce::TextButton::textColourOffId, AMBER);
+    saveBtn.onClick = [this] { onSavePreset(); };
+    addAndMakeVisible(saveBtn);
+
+    // Auto-play — standalone only (VST/AU has no use for it and causes launch noise)
+    const bool isStandalone = audioProcessor.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     autoPlayBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
     autoPlayBtn.setColour(juce::TextButton::textColourOffId, AMBER);
     autoPlayBtn.onClick = [this] {
         audioProcessor.autoPlayEnabled = !audioProcessor.autoPlayEnabled;
         if (!audioProcessor.autoPlayEnabled) audioProcessor.allNotesOff();
     };
-    addAndMakeVisible(autoPlayBtn);
+    autoPlayBtn.setVisible(isStandalone);
 
     noteLabel.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 11.0f, juce::Font::bold));
     noteLabel.setColour(juce::Label::textColourId, AMBER);
     noteLabel.setJustificationType(juce::Justification::centredRight);
+    noteLabel.setVisible(isStandalone);
+
+    addAndMakeVisible(autoPlayBtn);
     addAndMakeVisible(noteLabel);
 
-    // Build combos and load first preset
+    // Build preset list. In VST/AU the DAW already restored state via setStateInformation
+    // so don't overwrite it with loadPreset(0). In Standalone, load the first preset.
     populatePresetCombos();
-    audioProcessor.presetManager.loadPreset(0);
+    if (isStandalone)
+        audioProcessor.presetManager.loadPreset(0);
     updatePresetDisplay();
 
     startTimerHz(30);
@@ -299,6 +311,55 @@ void VoidWaveAudioProcessorEditor::timerCallback()
                       juce::dontSendNotification);
 }
 
+void VoidWaveAudioProcessorEditor::onSavePreset()
+{
+    // Show a name-entry dialog, then save current APVTS state as a .vwpreset
+    auto dialog = std::make_shared<juce::AlertWindow>("Save Preset", "Enter a name for this preset:", juce::MessageBoxIconType::NoIcon);
+    dialog->addTextEditor("name", "", "Preset name");
+    dialog->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
+    dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+
+    // Suggest current preset name as default
+    auto& pm = audioProcessor.presetManager;
+    if (pm.getNumPresets() > 0)
+        dialog->getTextEditor("name")->setText(pm.getPreset(pm.getCurrentIndex()).name);
+
+    dialog->enterModalState(true, juce::ModalCallbackFunction::create(
+        [this, dialog](int result)
+        {
+            if (result == 0) return;
+            juce::String name = dialog->getTextEditorContents("name").trim();
+            if (name.isEmpty()) return;
+
+            // Ask which category to save into
+            auto& pm2 = audioProcessor.presetManager;
+            juce::StringArray cats;
+            for (int i = 0; i < pm2.getNumPresets(); ++i)
+            {
+                const auto& cat = pm2.getPreset(i).category;
+                if (!cats.contains(cat)) cats.add(cat);
+            }
+            if (cats.isEmpty()) cats.add("USER");
+
+            juce::AlertWindow::showOkCancelBox(
+                juce::MessageBoxIconType::NoIcon, "Category",
+                "Save '" + name + "' to which category?\n\n" + cats.joinIntoString(" / "),
+                "USER", "Cancel", nullptr,
+                juce::ModalCallbackFunction::create([this, name, cats](int ok)
+                {
+                    juce::String cat = ok ? "USER" : "";
+                    if (cat.isEmpty()) return;
+
+                    if (audioProcessor.presetManager.savePreset(name, cat))
+                    {
+                        audioProcessor.presetManager.refresh();
+                        populatePresetCombos();
+                        statusLabel.setText("Saved: " + name, juce::dontSendNotification);
+                    }
+                }));
+        }));
+}
+
 // ── Paint / layout ────────────────────────────────────────────────────────────
 
 void VoidWaveAudioProcessorEditor::paint(juce::Graphics& g)
@@ -383,9 +444,10 @@ void VoidWaveAudioProcessorEditor::resized()
     nextBtn    .setBounds(614,     18, 22, 20);
     importBtn  .setBounds(640,     16, 56,  24);  // import folder
     statusLabel.setBounds(700,     22, 100, 12);
-    midiMapBtn .setBounds(W - 185, 16, 62,  24);  // MIDI MAP left of AUTO
-    autoPlayBtn.setBounds(W - 120, 16, 56,  24);
-    noteLabel  .setBounds(W - 62,  12, 54,  28);
+    saveBtn    .setBounds(W - 250, 16, 56,  24);  // SAVE
+    midiMapBtn .setBounds(W - 190, 16, 62,  24);  // MIDI MAP
+    autoPlayBtn.setBounds(W - 125, 16, 56,  24);  // AUTO (standalone only)
+    noteLabel  .setBounds(W - 66,  12, 58,  28);
 
     midiLearnOverlay.setBounds(getLocalBounds());
 
