@@ -1,7 +1,7 @@
 #include "EnvelopeSection.h"
 #include "LookAndFeel.h"
 
-static const juce::Colour GREEN { VW::NEON_AMBER };
+static const juce::Colour GREEN { VW::SEC_ENV };
 
 void EnvelopeSection::iniKnob(juce::Slider& s, juce::Label& l)
 {

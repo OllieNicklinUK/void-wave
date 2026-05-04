@@ -1,6 +1,6 @@
 #include "LFOSection.h"
 #include "LookAndFeel.h"
-static const juce::Colour PURPLE { VW::NEON_AMBER };
+static const juce::Colour PURPLE { VW::SEC_LFO };
 
 void LFOSection::iniKnob(juce::Slider& s, juce::Label& l)
 {

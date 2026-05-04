@@ -1,6 +1,6 @@
 #include "FXSection.h"
 #include "LookAndFeel.h"
-static const juce::Colour ORANGE { 0xffff9f43 };
+static const juce::Colour ORANGE { VW::SEC_FX };
 
 static void iniMiniKnob(juce::Slider& s, juce::Label& l, juce::Colour acc)
 {

@@ -24,45 +24,11 @@ OscSection::OscSection(VoidWaveAudioProcessor& p,
     iniK(sWidth, lWidth);
     if (pfx == "osc1") { iniK(sPitchAtk, lPitchAtk); iniK(sPitchAmt, lPitchAmt); }
 
-    // TABLE: hidden slider (APVTS-bound) + visible arrow buttons + name label
+    // TABLE: hidden slider, APVTS-bound. Value is now set from WavetableDisplay popup.
     sTable.setSliderStyle(juce::Slider::LinearHorizontal);
     sTable.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    sTable.setVisible(false);   // driven by tablePrev/tableNext
+    sTable.setVisible(false);
     attTable = std::make_unique<SlAtt>(t, pfx + "_table", sTable);
-
-    const char* TABLE_NAMES[] = {
-        "SINE","SAW","SQUARE","SPECTRAL","FORMANT A","FORMANT E",
-        "BASS 01","BASS 02","NOISE","USER 01","USER 02","USER 03"
-    };
-    auto updateTableLabel = [this, TABLE_NAMES]() {
-        int idx = juce::roundToInt(sTable.getValue());
-        int n   = static_cast<int>(sizeof(TABLE_NAMES) / sizeof(TABLE_NAMES[0]));
-        tableNameLbl.setText(TABLE_NAMES[juce::jlimit(0, n-1, idx % n)],
-                             juce::dontSendNotification);
-    };
-
-    for (auto* btn : { &tablePrev, &tableNext })
-    {
-        btn->setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
-        btn->setColour(juce::TextButton::textColourOffId, acc);
-        addAndMakeVisible(btn);
-    }
-    tablePrev.onClick = [this, updateTableLabel]() {
-        sTable.setValue(juce::jmax(sTable.getMinimum(), sTable.getValue() - 1));
-        updateTableLabel();
-    };
-    tableNext.onClick = [this, updateTableLabel]() {
-        sTable.setValue(juce::jmin(sTable.getMaximum(), sTable.getValue() + 1));
-        updateTableLabel();
-    };
-    // Also update label whenever slider changes (e.g. preset load)
-    sTable.onValueChange = [updateTableLabel]() { updateTableLabel(); };
-
-    tableNameLbl.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 9.0f, juce::Font::bold));
-    tableNameLbl.setColour(juce::Label::textColourId, acc);
-    tableNameLbl.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(tableNameLbl);
-    updateTableLabel();
 
     auto iniC = [&](juce::ComboBox& c, juce::Label& l)
     {
@@ -132,15 +98,11 @@ void OscSection::resized()
 {
     const int W = getWidth(), pad = 8;
 
-    // Table nav row: [<] [  WAVE TYPE NAME  ] [>]
-    tablePrev    .setBounds(pad,          16, 20, 16);
-    tableNameLbl .setBounds(pad + 22,     16, W - pad*2 - 44, 16);
-    tableNext    .setBounds(W - pad - 20, 16, 20, 16);
-
+    // Combos start immediately below header — no table nav row any more
     int cw = (W - 3 * pad) / 2;
-    lUnison .setBounds(pad,          34, cw, 10); cUnison .setBounds(pad,          44, cw, 17);
-    lPhase  .setBounds(pad+cw+pad,   34, cw, 10); cPhase  .setBounds(pad+cw+pad,   44, cw, 17);
-    lWTMode .setBounds(pad,          64, cw*2+pad, 10); cWTMode.setBounds(pad,     74, cw*2+pad, 17);
+    lUnison .setBounds(pad,          18, cw, 10); cUnison .setBounds(pad,          28, cw, 17);
+    lPhase  .setBounds(pad+cw+pad,   18, cw, 10); cPhase  .setBounds(pad+cw+pad,   28, cw, 17);
+    lWTMode .setBounds(pad,          48, cw*2+pad, 10); cWTMode.setBounds(pad,     58, cw*2+pad, 17);
 
     int kw = (W - 2 * pad) / 3;
     const int K = 38, Km = 28;

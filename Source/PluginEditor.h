@@ -11,6 +11,7 @@
 #include "UI/MacroSection.h"
 #include "UI/FXSection.h"
 #include "UI/MidiLearnOverlay.h"
+#include "UI/PresetBrowser.h"
 
 class VoidWaveAudioProcessorEditor : public juce::AudioProcessorEditor,
                                      private juce::Timer
@@ -36,22 +37,18 @@ private:
     MacroSection     macroSection;
     FXSection        fxSection;
 
-    // Preset bar — category filter + preset selector
+    // Preset bar — prev/next + name display button + import
     juce::TextButton prevBtn { "<" }, nextBtn { ">" };
-    juce::ComboBox   catCombo;      // category filter
-    juce::ComboBox   presetCombo;   // presets in selected category
-    juce::Label      statusLabel;
-
-    // Maps presetCombo item IDs to PresetManager indices
-    juce::Array<int> presetComboMap;
-
-    // Preset import
+    juce::TextButton presetNameBtn;          // shows current preset, click to open browser
     juce::TextButton importBtn { "IMPORT" };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
+    // Three-column browser (shown as overlay)
+    PresetBrowser presetBrowser;
+
     // MIDI learn
-    juce::TextButton     midiMapBtn { "MIDI MAP" };
-    MidiLearnOverlay     midiLearnOverlay;
+    juce::TextButton midiMapBtn { "MIDI MAP" };
+    MidiLearnOverlay midiLearnOverlay;
 
     // Save preset
     juce::TextButton saveBtn { "SAVE" };
@@ -61,11 +58,10 @@ private:
     juce::Label      noteLabel;
 
     void timerCallback() override;
-    void populatePresetCombos();           // rebuild from PresetManager
-    void onCategoryChanged();              // catCombo changed
-    void onPresetSelected();               // presetCombo changed
-    void updatePresetDisplay();            // sync combos to currentIndex
-    void onSavePreset();                   // save current params as named preset
+    void updatePresetDisplay();
+    void showBrowser();
+    void hideBrowser();
+    void onSavePreset();
     static juce::String midiNoteToName(int note);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoidWaveAudioProcessorEditor)

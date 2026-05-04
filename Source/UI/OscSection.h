@@ -17,12 +17,8 @@ private:
 
     juce::Slider  sPos, sCoarse, sFine, sLevel, sPan, sDetune;
     juce::Slider  sWidth, sPitchAtk, sPitchAmt;
-    juce::Slider  sTable;   // hidden, APVTS-bound; value driven by arrows
+    juce::Slider  sTable;   // hidden, APVTS-bound; driven from WavetableDisplay
     juce::ComboBox cUnison, cPhase, cWTMode;
-
-    // Wavetable type cycle UI
-    juce::TextButton tablePrev{"<"}, tableNext{">"};
-    juce::Label      tableNameLbl;
 
     juce::Label lPos{"","POS"}, lCoarse{"","COARSE"}, lFine{"","FINE"},
                 lLevel{"","LEVEL"}, lPan{"","PAN"}, lDetune{"","DETUNE"},

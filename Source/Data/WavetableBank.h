@@ -41,6 +41,10 @@ private:
     void addSineTable();
     void addSawTable();
     void addSquareTable();
+    void addSpectralTable();
+    void addFormantTable(int variant);  // 0 = A→I,  1 = E→O
+    void addBassTable(int variant);     // 0 = sub,   1 = hollow
+    void addNoiseTable();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WavetableBank)
 };

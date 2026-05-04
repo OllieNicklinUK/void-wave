@@ -18,8 +18,8 @@ static void styleCombo(juce::ComboBox& c)
 
 VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p)
-    , osc1Section      (p, "osc1", AMBER)
-    , osc2Section      (p, "osc2", AMBER)
+    , osc1Section      (p, "osc1", juce::Colour(VW::SEC_OSC1))
+    , osc2Section      (p, "osc2", juce::Colour(VW::SEC_OSC2))
     , wtDisplay        (p)
     , filterSection    (p)
     , envSection       (p)
@@ -28,6 +28,7 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     , lfoSection   (p)
     , macroSection (p)
     , fxSection    (p)
+    , presetBrowser(p)
 {
     setLookAndFeel(&lookAndFeel);
     setSize(1100, 620);
@@ -59,18 +60,16 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     addAndMakeVisible(prevBtn);
     addAndMakeVisible(nextBtn);
 
-    // Category combo
-    styleCombo(catCombo);
-    catCombo.onChange = [this] { onCategoryChanged(); };
-    addAndMakeVisible(catCombo);
+    // Preset name button — click to open the three-column browser
+    presetNameBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BG_RAISED));
+    presetNameBtn.setColour(juce::TextButton::textColourOffId, AMBER);
+    presetNameBtn.setColour(juce::TextButton::textColourOnId,  AMBER);
+    presetNameBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(VW::BG_RAISED));
+    presetNameBtn.setClickingTogglesState(false);
+    presetNameBtn.onClick = [this] { showBrowser(); };
+    addAndMakeVisible(presetNameBtn);
 
-    // Preset combo
-    styleCombo(presetCombo);
-    presetCombo.setTextWhenNothingSelected("--- select preset ---");
-    presetCombo.onChange = [this] { onPresetSelected(); };
-    addAndMakeVisible(presetCombo);
-
-    // IMPORT button — opens folder picker, loads all .vwpreset files found
+    // IMPORT button
     importBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
     importBtn.setColour(juce::TextButton::textColourOffId, AMBER);
     importBtn.onClick = [this]
@@ -89,34 +88,24 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
             {
                 auto results = fc.getResults();
                 if (results.isEmpty()) return;
-
                 int added = 0;
                 juce::StringArray foldersImported;
-
                 for (const auto& chosen : results)
                 {
                     if (!chosen.exists()) continue;
-
                     if (chosen.isDirectory())
                     {
-                        // Import whole folder tree
-                        int n = audioProcessor.presetManager.importFromFolder(chosen);
-                        added += n;
+                        added += audioProcessor.presetManager.importFromFolder(chosen);
                         foldersImported.addIfNotAlreadyThere(chosen.getFullPathName());
                     }
                     else if (chosen.hasFileExtension(".vwpreset"))
                     {
-                        // Single file — add directly; category from parent folder name
-                        int n = audioProcessor.presetManager.importFromFolder(
-                                    chosen.getParentDirectory());
-                        added += n;
-                        foldersImported.addIfNotAlreadyThere(
-                            chosen.getParentDirectory().getFullPathName());
+                        added += audioProcessor.presetManager.importFromFolder(chosen.getParentDirectory());
+                        foldersImported.addIfNotAlreadyThere(chosen.getParentDirectory().getFullPathName());
                     }
                 }
-
-                populatePresetCombos();
-
+                presetBrowser.refresh();
+                updatePresetDisplay();
                 juce::AlertWindow::showMessageBoxAsync(
                     juce::AlertWindow::InfoIcon, "Import complete",
                     juce::String(added) + " presets loaded from "
@@ -125,11 +114,11 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     };
     addAndMakeVisible(importBtn);
 
-    // Status
-    statusLabel.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::plain));
-    statusLabel.setColour(juce::Label::textColourId, juce::Colour(0xff3a3d48));
-    statusLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(statusLabel);
+    // Browser panel — full-editor overlay, hidden until opened.
+    // Use addChildComponent (not addAndMakeVisible) so it stays hidden at launch.
+    presetBrowser.onPresetSelected = [this](int) { updatePresetDisplay(); };
+    presetBrowser.onClose          = [this]      { hideBrowser(); };
+    addChildComponent(presetBrowser);
 
     // MIDI MAP button
     midiMapBtn.setClickingTogglesState(true);
@@ -175,9 +164,8 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     addAndMakeVisible(autoPlayBtn);
     addAndMakeVisible(noteLabel);
 
-    // Build preset list. In VST/AU the DAW already restored state via setStateInformation
-    // so don't overwrite it with loadPreset(0). In Standalone, load the first preset.
-    populatePresetCombos();
+    // Build preset list. In VST/AU the DAW already restored state via setStateInformation.
+    presetBrowser.refresh();
     if (isStandalone)
         audioProcessor.presetManager.loadPreset(0);
     updatePresetDisplay();
@@ -191,109 +179,29 @@ VoidWaveAudioProcessorEditor::~VoidWaveAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
-// ── Preset combo logic ────────────────────────────────────────────────────────
+// ── Preset browser logic ──────────────────────────────────────────────────────
 
-void VoidWaveAudioProcessorEditor::populatePresetCombos()
+void VoidWaveAudioProcessorEditor::showBrowser()
 {
-    auto& pm = audioProcessor.presetManager;
-    pm.refresh();
-    int   n  = pm.getNumPresets();
-
-
-    // Gather unique categories in order of appearance
-    juce::StringArray cats;
-    cats.add("ALL");
-    for (int i = 0; i < n; ++i)
-    {
-        const auto& cat = pm.getPreset(i).category;
-        if (!cats.contains(cat)) cats.add(cat);
-    }
-
-    catCombo.clear(juce::dontSendNotification);
-    for (int i = 0; i < cats.size(); ++i)
-        catCombo.addItem(cats[i], i + 1);
-    catCombo.setSelectedId(1, juce::dontSendNotification);   // "ALL"
-
-    // Fill preset combo with all presets initially
-    presetCombo.clear(juce::dontSendNotification);
-    presetComboMap.clear();
-    for (int i = 0; i < n; ++i)
-    {
-        presetCombo.addItem(pm.getPreset(i).name, i + 1);
-        presetComboMap.add(i);
-    }
-
-    statusLabel.setText(juce::String(n) + " presets  |  " + juce::String(cats.size() - 1) + " cats", juce::dontSendNotification);
+    presetBrowser.setBounds(getLocalBounds());
+    presetBrowser.setVisible(true);
+    presetBrowser.toFront(true);
+    presetBrowser.grabKeyboardFocus();
 }
 
-void VoidWaveAudioProcessorEditor::onCategoryChanged()
+void VoidWaveAudioProcessorEditor::hideBrowser()
 {
-    auto& pm      = audioProcessor.presetManager;
-    int   n       = pm.getNumPresets();
-    juce::String selCat = catCombo.getText();
-
-    presetCombo.clear(juce::dontSendNotification);
-    presetComboMap.clear();
-
-    juce::String lastSub;
-    for (int i = 0; i < n; ++i)
-    {
-        const auto& p = pm.getPreset(i);
-        if (selCat != "ALL" && p.category != selCat) continue;
-
-        // Sub-category section header when sub changes
-        if (p.sub.isNotEmpty() && p.sub != lastSub)
-        {
-            presetCombo.addSectionHeading(p.sub);
-            lastSub = p.sub;
-        }
-
-        presetCombo.addItem(p.name, presetComboMap.size() + 1);
-        presetComboMap.add(i);
-    }
-
-    if (presetCombo.getNumItems() > 0)
-    {
-        presetCombo.setSelectedId(1, juce::dontSendNotification);
-        audioProcessor.presetManager.loadPreset(presetComboMap[0]);
-    }
-    statusLabel.setText(juce::String(presetComboMap.size()) + " presets", juce::dontSendNotification);
-}
-
-void VoidWaveAudioProcessorEditor::onPresetSelected()
-{
-    int comboId = presetCombo.getSelectedId();
-    if (comboId <= 0 || comboId > presetComboMap.size()) return;
-    int pmIdx = presetComboMap[comboId - 1];
-    audioProcessor.presetManager.loadPreset(pmIdx);
+    presetBrowser.setVisible(false);
+    updatePresetDisplay();
 }
 
 void VoidWaveAudioProcessorEditor::updatePresetDisplay()
 {
-    auto& pm  = audioProcessor.presetManager;
-    int   cur = pm.getCurrentIndex();
-    if (pm.getNumPresets() == 0) return;
+    auto& pm = audioProcessor.presetManager;
+    if (pm.getNumPresets() == 0) { presetNameBtn.setButtonText("--- no presets ---"); return; }
 
-    const auto& p = pm.getPreset(cur);
-
-    // Sync category combo (switch to ALL or correct cat if visible)
-    juce::String currentCat = catCombo.getText();
-    if (currentCat != "ALL" && currentCat != p.category)
-    {
-        // Switch to ALL to ensure the preset is visible
-        catCombo.setSelectedItemIndex(0, juce::dontSendNotification);
-        onCategoryChanged();
-    }
-
-    // Sync preset combo to current preset
-    for (int i = 0; i < presetComboMap.size(); ++i)
-    {
-        if (presetComboMap[i] == cur)
-        {
-            presetCombo.setSelectedId(i + 1, juce::dontSendNotification);
-            break;
-        }
-    }
+    const auto& p = pm.getPreset(pm.getCurrentIndex());
+    presetNameBtn.setButtonText(p.category + "  /  " + p.name);
 }
 
 // ── Timer / utils ─────────────────────────────────────────────────────────────
@@ -352,9 +260,8 @@ void VoidWaveAudioProcessorEditor::onSavePreset()
 
                     if (audioProcessor.presetManager.savePreset(name, cat))
                     {
-                        audioProcessor.presetManager.refresh();
-                        populatePresetCombos();
-                        statusLabel.setText("Saved: " + name, juce::dontSendNotification);
+                        presetBrowser.refresh();
+                        updatePresetDisplay();
                     }
                 }));
         }));
@@ -438,18 +345,17 @@ void VoidWaveAudioProcessorEditor::resized()
     const int W = getWidth();
 
     // Top bar layout
-    prevBtn    .setBounds(110,     18, 22, 20);
-    catCombo   .setBounds(136,     14, 80, 28);   // category filter
-    presetCombo.setBounds(220,     14, 390, 28);  // preset list
-    nextBtn    .setBounds(614,     18, 22, 20);
-    importBtn  .setBounds(640,     16, 56,  24);  // import folder
-    statusLabel.setBounds(700,     22, 100, 12);
-    saveBtn    .setBounds(W - 250, 16, 56,  24);  // SAVE
-    midiMapBtn .setBounds(W - 190, 16, 62,  24);  // MIDI MAP
-    autoPlayBtn.setBounds(W - 125, 16, 56,  24);  // AUTO (standalone only)
-    noteLabel  .setBounds(W - 66,  12, 58,  28);
+    prevBtn      .setBounds(110,     18, 22, 20);
+    presetNameBtn.setBounds(136,     14, 470, 28);  // clickable preset name
+    nextBtn      .setBounds(610,     18, 22, 20);
+    importBtn    .setBounds(636,     16, 56,  24);
+    saveBtn      .setBounds(W - 250, 16, 56,  24);
+    midiMapBtn   .setBounds(W - 190, 16, 62,  24);
+    autoPlayBtn  .setBounds(W - 125, 16, 56,  24);
+    noteLabel    .setBounds(W - 66,  12, 58,  28);
 
     midiLearnOverlay.setBounds(getLocalBounds());
+    presetBrowser   .setBounds(getLocalBounds());
 
     // Grid layout
     const int TOP = 56, FX_H = 79;

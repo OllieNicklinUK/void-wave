@@ -24,6 +24,16 @@ namespace VW
     inline constexpr uint32_t NEON_GREEN  = 0xff00ff88;  // envelope
     inline constexpr uint32_t NEON_RED    = 0xffff3355;  // danger / drive
 
+    // ── Section accent colours — warm amber family, distinct roles ─────────
+    // All share the amber DNA; brightness and warmth signal the section character.
+    inline constexpr uint32_t SEC_OSC1   = 0xfff5a623;  // amber   — OSC 1 (brand)
+    inline constexpr uint32_t SEC_OSC2   = 0xffff7820;  // orange  — OSC 2 (hotter)
+    inline constexpr uint32_t SEC_FILTER = 0xffcc3800;  // red-orange — aggressive cut
+    inline constexpr uint32_t SEC_ENV    = 0xffd4a800;  // gold    — soft, sustaining
+    inline constexpr uint32_t SEC_LFO    = 0xffa07030;  // copper  — slow, organic
+    inline constexpr uint32_t SEC_FX     = 0xff784020;  // bronze  — deep, subtle
+    inline constexpr uint32_t SEC_WT     = 0xfff5a623;  // amber   — wavetable display
+
     // ── Text ──────────────────────────────────────────────────────────────────
     inline constexpr uint32_t TEXT_BRIGHT = 0xffe8edf8;
     inline constexpr uint32_t TEXT_MID    = 0xff7a8099;

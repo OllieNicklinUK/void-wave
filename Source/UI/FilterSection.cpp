@@ -1,6 +1,6 @@
 #include "FilterSection.h"
 #include "LookAndFeel.h"
-static const juce::Colour AMBER { VW::NEON_AMBER };
+static const juce::Colour AMBER { VW::SEC_FILTER };
 
 // ── Shared ADSR drawing ───────────────────────────────────────────────────────
 
