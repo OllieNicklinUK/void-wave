@@ -8,7 +8,8 @@
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 
 ; Paths are relative to the repo root (where makensis.exe is invoked from)
-!define VST3_SRC  "build\VoidWave_artefacts\Release\VST3\Void Wave.vst3"
+; COPY_PLUGIN_AFTER_BUILD copies the bundle here during the CI build step
+!define VST3_SRC  "C:\Program Files\Common Files\VST3\Void Wave.vst3"
 !define EXE_SRC   "build\VoidWave_artefacts\Release\Standalone\Void Wave.exe"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
