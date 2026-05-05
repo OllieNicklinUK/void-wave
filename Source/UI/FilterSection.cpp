@@ -117,24 +117,9 @@ FilterSection::FilterSection(VoidWaveAudioProcessor& p) : processor(p)
 void FilterSection::paint(juce::Graphics& g)
 {
     const int W = getWidth(), H = getHeight(), pad = 8;
-    g.fillAll(juce::Colour(VW::BG_PANEL));
-    g.setColour(AMBER);
-    g.fillRect(0, 0, W, 14);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
-    g.setColour(juce::Colour(0xffffffff));
-    g.drawText("FILTER", 0, 0, W * 2 / 3, 14, juce::Justification::centred);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.0f, juce::Font::plain));
-    g.setColour(juce::Colour(0xffffffff).withAlpha(0.55f));
-    g.drawText("ENV1 \xe2\x86\x92 CUTOFF", W / 2, 0, W / 2 - pad, 14, juce::Justification::centredRight);
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawRect(getLocalBounds(), 1);
 
-    // ADSR visualisation canvas
+    // ADSR visualisation canvas (no fill — PNG background shows through)
     auto vizArea = juce::Rectangle<float>(pad, 17, W - 2*pad, 68);
-    g.setColour(juce::Colour(VW::BG_PANEL));
-    g.fillRoundedRectangle(vizArea, 3.0f);
-    g.setColour(juce::Colour(VW::BORDER_VIS));
-    g.drawRoundedRectangle(vizArea, 3.0f, 1.0f);
 
     // Grid
     g.setColour(AMBER.withAlpha(0.04f));
@@ -163,30 +148,44 @@ void FilterSection::resized()
 {
     const int W = getWidth(), pad = 8;
 
-    // TYPE combo — full width at top
-    lType.setBounds(pad, 90, 30, 10);
-    cType.setBounds(pad + 32, 88, W - pad - 32 - pad, 17);
+    // TYPE combo — nudged down to clear the viz background
+    lType.setBounds(pad, 94, 30, 10);
+    cType.setBounds(pad + 32, 92, W - pad - 32 - pad, 17);
 
-    // CUTOFF + RES side by side as the two primary controls
-    const int K = 46;
-    int halfW   = (W - 3 * pad) / 2;
-    int leftX   = pad + (halfW - K) / 2;
-    int rightX  = pad + halfW + pad + (halfW - K) / 2;
-    int kY      = 112;
+    // Available vertical space below combo: getHeight() - 104
+    // Primary knobs (CUTOFF 50% bigger, RES 30% bigger), secondary 30% bigger
+    // Spread to fill the section height
+    const int KC  = 63;   // CUTOFF: 42 * 1.5
+    const int KR  = 55;   // RES:    42 * 1.3
+    const int Km  = 36;   // DRIVE/KEY/VEL: 28 * 1.3
+    const int H   = getHeight();
+    const int avail = H - 106;                        // space below combo
 
-    sCutoff.setBounds(leftX,  kY, K, K);
-    lCutoff.setBounds(pad,    kY + K + 2, halfW, 10);
-    sRes   .setBounds(rightX, kY, K, K);
-    lRes   .setBounds(pad + halfW + pad, kY + K + 2, halfW, 10);
+    // Three zones: primary row, gap, secondary row, gap
+    const int primaryH   = KC + 14;                   // knob + label
+    const int secondaryH = Km + 14;
+    const int totalUsed  = primaryH + secondaryH + 24; // 24px gap between rows
+    const int topPad     = (avail - totalUsed) / 2;
 
-    // Bottom row: DRIVE, KEY TRK, VEL TRK
-    const int Km = 32;
-    int kw3 = (W - 2 * pad) / 3;
+    int kY = 104 + topPad;
+
+    int halfW  = (W - 3 * pad) / 2;
+    int leftX  = pad + (halfW - KC) / 2;
+    int rightX = pad + halfW + pad + (halfW - KR) / 2;
+    int centreY = kY + KC / 2;                         // vertical centre of primary row
+
+    sCutoff.setBounds(leftX,              kY,                   KC, KC);
+    lCutoff.setBounds(pad,                kY + KC + 3,          halfW, 10);
+    sRes   .setBounds(rightX,             centreY - KR / 2,     KR, KR);
+    lRes   .setBounds(pad + halfW + pad,  kY + KC + 3,          halfW, 10);
+
+    int kY2  = kY + primaryH + 24;
+    int kw3  = (W - 2 * pad) / 3;
     auto plK3 = [&](juce::Slider& s, juce::Label& l, int col)
     {
         int x = pad + col * kw3 + (kw3 - Km) / 2;
-        s.setBounds(x, 186, Km, Km);
-        l.setBounds(pad + col * kw3, 186 + Km + 2, kw3, 10);
+        s.setBounds(x, kY2,          Km, Km);
+        l.setBounds(pad + col * kw3, kY2 + Km + 3, kw3, 10);
     };
     plK3(sDrive,    lDrive,   0);
     plK3(sKeyTrack, lKey,     1);

@@ -306,26 +306,12 @@ void WavetableDisplay::paint(juce::Graphics& g)
     const int W = getWidth(), H = getHeight();
     const int pad = 8;
 
-    g.fillAll(juce::Colour(VW::BG_PANEL));
-
-    // Header
-    g.setColour(juce::Colour(VW::SEC_WT));
-    g.fillRect(0, 0, W, 14);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
-    g.setColour(juce::Colour(0xffffffff));
-    g.drawText("WAVETABLE", 0, 0, W, 14, juce::Justification::centred);
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawRect(getLocalBounds(), 1);
 
     // Canvas
     auto canvas = juce::Rectangle<float>(
         pad, 18.0f,
         W - 2 * pad, H - 18.0f - 44.0f - 4.0f);
 
-    g.setColour(juce::Colour(VW::BG_PANEL));
-    g.fillRoundedRectangle(canvas, 4.0f);
-    g.setColour(juce::Colour(VW::BORDER_VIS));
-    g.drawRoundedRectangle(canvas, 4.0f, 1.0f);
 
     // Read params
     int   t1  = pOsc1Table ? static_cast<int>(pOsc1Table->load()) : 0;

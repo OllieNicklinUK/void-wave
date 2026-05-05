@@ -89,9 +89,13 @@ juce::File PresetManager::getUserPresetFolder()
 
 void PresetManager::refresh()
 {
+    int savedIdx = currentIndex;   // preserve across rebuild
     presets.clear();
     loadFactoryPresets();
     scanUserFolder();
+    // Keep the same index clamped to the new list size
+    if (!presets.empty())
+        currentIndex = juce::jlimit(0, (int)presets.size() - 1, savedIdx);
 }
 
 void PresetManager::loadFactoryPresets()

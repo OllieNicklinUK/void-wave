@@ -1,0 +1,53 @@
+\documentclass{scrartcl}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage[font={small,it}]{caption}
+\usepackage{pdflscape}
+\usepackage{rotating}
+\usepackage{multido}
+\usetikzlibrary{dsp,chains}
+\usepackage{expl3}
+\ExplSyntaxOn
+\cs_new_eq:NN \Repeat \prg_replicate:nn
+\ExplSyntaxOff
+\newcommand{\skipnodes}[1]{
+    \Repeat{#1}{{};\&}
+}
+
+\title{Modified Gardner Reverb}
+\subtitle{Sound Processing Mini Project}
+\author{Pelle Juul Christensen, SMC7, Aalborg Universitet}
+
+\begin{document}
+\maketitle
+
+This document serves to describe the algorithms used in my \textit{sound processing mini project} to implement an artificial reverberator. First I will describe the implementation of an algorithm for modelling early reverberation. Afterwards an algorithm for modelling late reverberation. Lastly I comment on how these algorithms a implemented in practice.
+
+\section{Early Reflections}
+When a sound propagates through a room it will first arrive at the listener from the \textit{direct path} -- the shortest path, usually a straight line, between the source and the listener. Afterwards the first reflections off the walls of the room will arrive, these are the \textit{second order reflections}. After that we have third and fourth order reflections and so on. These are referred to as the \textit{early reflections}, and are especially important for the spatial impression of the sound \cite[p. 100]{gardner2002}.
+
+The early reflection algorithm I implemented is shown in figure 1, which is based on the algorithm presented in \cite[p. 104]{gardner2002}. This is implmented via two tapped delay lines for the left and right channels respectively. The delay times and coefficients were calculated using Amcoustics Amray tool\footnote{\url{https://amcoustics.com/tools/amray}}. In case of stereo input the left and right channels are mix together to yield a single sound source. The crossover filter and delay acts as a simple head-related filter model for increased spatial impression.
+
+\section{Late Reverberation}
+After the early reflections comes the late reverberation -- a dense collection of echos indistinguishable from one another. This results in a diffuse prolonging of the sound as the energy is absorbed by the room.
+
+To emulate the sound of natural reverberation I implemented a version of Gardner's \textit{Medium Room Reverberator} found in \cite[p. 56]{gardner1982}. This was modified with ideas taken from Dattorro's plate reverberator algorithm shown in \cite[p. 117]{gardner2002}. For a greater stereo image an instance of the algorithm was used for both the left and right channels with slightly different delay parameters. These then feed back into one another, rather than to themselves. Furthermore a time variant component was included to generate a slight movement to the sound, and also to prevent some coloration, since the resonant frequency of the reverberator is being modulated. A diagram of the algorithm is shown in figure 2.
+
+\section{Implementation Notes}
+The algorithms were implemented as a VST/AudioUnit plug-in. The early reflection algorithm feeds directly into the late reverberation algorithm. A graphical user interface allows the user to control the $g$ (decay) parameter of the late reverberation algorithm, as well the mix of dry to reverberated signal.
+
+\begin{landscape}
+\input{early}
+\end{landscape}
+
+\begin{landscape}
+\input{late}
+\end{landscape}
+
+% http://www.texample.net/tikz/examples/fir-filter/
+
+\bibliographystyle{plain}
+\bibliography{bibliography}
+
+\end{document}

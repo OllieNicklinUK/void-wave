@@ -389,8 +389,9 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
             float inputLevel = (std::abs(v.tmpL[s]) + std::abs(v.tmpR[s])) * 0.5f;
             float filterFM   = inputLevel * 55.0f;   // ~55Hz per unit amplitude
 
+            // Fixed 6000Hz scale: env1 sweeps the full audible range at any base cutoff.
             float cutoff = baseCutoff
-                + env1Val * lastParams.env1Depth * (baseCutoff - 20.f)
+                + env1Val * lastParams.env1Depth * 6000.f
                 + lfo2Val * 4000.f
                 + filterFM;
             cutoff = juce::jlimit(20.f, 20000.f, cutoff);

@@ -61,97 +61,107 @@ void VoidWaveLookAndFeel::paintNeonArc(juce::Graphics& g,
                      juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
-// ── Rotary knob — GR-8 style: flat body + needle indicator ───────────────────
-// Reference: Phuturetone GR-8 (dark grey circular body, thin white pointer line)
+// ── Rotary knob — flat metallic disc + outer glow arc ────────────────────────
+// Flat-top look: linear top→bottom gradient (overhead light on flat surface),
+// not a sphere. Arc placed at halfW-4.5 so glow stays inside component bounds.
 
 void VoidWaveLookAndFeel::drawRotarySlider(juce::Graphics& g,
     int x, int y, int width, int height,
     float sliderPos, float startAngle, float endAngle,
     juce::Slider& slider)
 {
-    const float cx  = x + width  * 0.5f;
-    const float cy  = y + height * 0.5f;
-    const float r   = (juce::jmin(width, height) * 0.5f) - 2.0f;
-    const float valueAngle = startAngle + sliderPos * (endAngle - startAngle);
+    const float cx   = x + width  * 0.5f;
+    const float cy   = y + height * 0.5f;
+    const float half = juce::jmin(width, height) * 0.5f;
+    const float r    = half - 7.5f;   // body: 7.5 px inside component edge
+    const float ar   = half - 4.5f;   // arc:  max glow = ar+2.25 = half-2.25 → no clip
+    const float ang  = startAngle + sliderPos * (endAngle - startAngle);
 
-    // ── Outer drop shadow ─────────────────────────────────────────────────────
-    g.setColour(juce::Colour(0x55000000));
-    g.fillEllipse(cx - r + 1.0f, cy - r + 2.5f, r * 2.0f, r * 2.0f);  // shadow offset
+    if (r < 4.0f) return;
 
-    // ── Knob body — dark metallic flat circle ─────────────────────────────────
+    // ── 1. Drop shadow (contained within component) ───────────────────────────
     {
-        // Base fill: dark grey (#222226)
-        g.setColour(juce::Colour(0xff222226));
+        juce::ColourGradient sh(
+            juce::Colour(0x55000000), cx, cy + r * 0.35f,
+            juce::Colour(0x00000000), cx, cy + r * 1.5f, true);
+        g.setGradientFill(sh);
+        g.fillEllipse(cx - r * 1.05f, cy - r * 0.65f + 2.5f,
+                      r * 2.1f, r * 2.1f);
+    }
+
+    // ── 2. Knob body — LINEAR top→bottom gradient = flat metallic disc ────────
+    // Key: NO radial centre highlight (that creates the sphere illusion).
+    // Overhead studio light → slightly lighter at top, darker at bottom.
+    {
+        juce::ColourGradient disc(
+            juce::Colour(0xff2e2e38), cx, cy - r,    // top: lighter
+            juce::Colour(0xff111116), cx, cy + r,    // bottom: darker
+            false);                                   // LINEAR, not radial
+        disc.addColour(0.38, juce::Colour(0xff202028));
+        disc.addColour(0.68, juce::Colour(0xff161620));
+        g.setGradientFill(disc);
         g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
-
-        // Subtle top-left specular (single arc, very faint)
-        juce::Path specular;
-        specular.addCentredArc(cx, cy, r * 0.9f, r * 0.9f, 0.0f,
-                               juce::MathConstants<float>::pi * 1.3f,
-                               juce::MathConstants<float>::pi * 1.7f, true);
-        g.setColour(juce::Colour(0x14ffffff));
-        g.strokePath(specular, juce::PathStrokeType(r * 0.25f));
-
-        // Bottom shadow inner edge
-        juce::Path shadow;
-        shadow.addCentredArc(cx, cy, r * 0.9f, r * 0.9f, 0.0f,
-                              juce::MathConstants<float>::pi * 0.2f,
-                              juce::MathConstants<float>::pi * 0.8f, true);
-        g.setColour(juce::Colour(0x20000000));
-        g.strokePath(shadow, juce::PathStrokeType(r * 0.22f));
-
-        // Outer rim: slightly lighter ring
-        g.setColour(juce::Colour(0xff2e2e34));
-        g.drawEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f, 1.2f);
     }
 
-    // ── Subtle track arc (very faint, just shows the sweep range) ────────────
+    // ── 3. Machined outer rim ─────────────────────────────────────────────────
     {
-        juce::Path track;
-        track.addCentredArc(cx, cy, r - 2.5f, r - 2.5f, 0.0f, startAngle, endAngle, true);
-        g.setColour(juce::Colour(0x18ffffff));
-        g.strokePath(track, juce::PathStrokeType(1.0f,
-                         juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        // Hard dark outer ring (the cut edge)
+        g.setColour(juce::Colour(0xff040407));
+        g.drawEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f, 1.8f);
+
     }
 
-    // ── Value arc mark (accent colour, thin) ─────────────────────────────────
+
+    // ── 6. Value arc — three-pass glow, all strokes within component bounds ───
     if (sliderPos > 0.005f)
     {
         juce::Path varc;
-        varc.addCentredArc(cx, cy, r - 2.5f, r - 2.5f, 0.0f, startAngle, valueAngle, true);
-        g.setColour(accent.withAlpha(0.55f));
-        g.strokePath(varc, juce::PathStrokeType(1.5f,
-                         juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        varc.addCentredArc(cx, cy, ar, ar, 0.0f, startAngle, ang, true);
+        const auto curved = juce::PathStrokeType::curved;
+        const auto rounded = juce::PathStrokeType::rounded;
+
+        // Wide soft glow  (ar + 2.25 = half - 2.25 → no clip)
+        g.setColour(accent.withAlpha(0.18f));
+        g.strokePath(varc, juce::PathStrokeType(4.5f, curved, rounded));
+        // Medium halo
+        g.setColour(accent.withAlpha(0.42f));
+        g.strokePath(varc, juce::PathStrokeType(2.4f, curved, rounded));
+        // Crisp bright line
+        g.setColour(accent.withAlpha(0.96f));
+        g.strokePath(varc, juce::PathStrokeType(1.6f, curved, rounded));
     }
 
-    // ── Needle indicator — thin pointer line from near-centre to near-rim ─────
+    // ── 7. Indicator — short bright notch at current angle ───────────────────
     {
-        float lineStart = r * 0.22f;   // start slightly off-centre
-        float lineEnd   = r * 0.78f;   // end well inside rim
-        float sx = cx + lineStart * std::sin(valueAngle);
-        float sy = cy - lineStart * std::cos(valueAngle);
-        float ex = cx + lineEnd   * std::sin(valueAngle);
-        float ey = cy - lineEnd   * std::cos(valueAngle);
+        const float inner = r * 0.52f;
+        const float outer = r * 0.88f;
+        float sx = cx + inner * std::sin(ang);
+        float sy = cy - inner * std::cos(ang);
+        float ex = cx + outer * std::sin(ang);
+        float ey = cy - outer * std::cos(ang);
 
-        // Shadow of needle
-        g.setColour(juce::Colour(0x55000000));
-        g.drawLine(sx + 0.6f, sy + 0.8f, ex + 0.6f, ey + 0.8f, 1.5f);
+        // Shadow
+        g.setColour(juce::Colour(0x50000000));
+        g.drawLine(sx + 0.5f, sy + 0.7f, ex + 0.5f, ey + 0.7f,
+                   juce::jmax(1.0f, r * 0.095f));
 
-        // Needle — bright white, clean
-        g.setColour(juce::Colour(0xffe8edf8));
-        g.drawLine(sx, sy, ex, ey, 1.5f);
+        // Notch line — white with slight amber tint
+        g.setColour(juce::Colour(0xfff0f0f8));
+        g.drawLine(sx, sy, ex, ey, juce::jmax(1.0f, r * 0.095f));
 
-        // Small bright dot at needle tip
-        g.setColour(accent.withAlpha(0.9f));
-        g.fillEllipse(ex - 1.8f, ey - 1.8f, 3.6f, 3.6f);
+        // Amber tip dot
+        const float dr = juce::jmax(1.4f, r * 0.10f);
+        g.setColour(accent.withAlpha(0.88f));
+        g.fillEllipse(ex - dr, ey - dr, dr * 2.0f, dr * 2.0f);
     }
 
-    // ── Value readout on hover ────────────────────────────────────────────────
-    if (slider.isMouseOverOrDragging() && slider.getTextBoxPosition() == juce::Slider::NoTextBox)
+    // ── 8. Value readout on hover ─────────────────────────────────────────────
+    if (slider.isMouseOverOrDragging() &&
+        slider.getTextBoxPosition() == juce::Slider::NoTextBox)
     {
-        g.setColour(juce::Colour(0xffe8edf8).withAlpha(0.85f));
+        g.setColour(juce::Colour(0xffe8edf8).withAlpha(0.92f));
         g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(),
-                             juce::jmax(6.0f, r * 0.42f), juce::Font::plain));
+                             juce::jmax(6.0f, r * 0.40f), juce::Font::plain));
         g.drawText(slider.getTextFromValue(slider.getValue()),
                    x, y, width, height, juce::Justification::centred, false);
     }
@@ -229,19 +239,28 @@ void VoidWaveLookAndFeel::drawButtonBackground(juce::Graphics& g,
     auto b  = button.getLocalBounds().toFloat().reduced(0.5f);
     bool on = button.getToggleState();
 
-    // Fill
-    juce::Colour fill = juce::Colour(VW::BG_RAISED);
-    if (down || on)        fill = accent.withAlpha(0.18f);
-    else if (highlighted)  fill = juce::Colour(VW::BG_HIGH);
-    g.setColour(fill);
-    g.fillRoundedRectangle(b, 3.0f);
+    // Fill — respect transparent buttonColourId (lets PNG show through)
+    juce::Colour base = button.findColour(juce::TextButton::buttonColourId);
+    juce::Colour fill = base;
+    if (down || on)       fill = accent.withAlpha(0.18f);
+    else if (highlighted) fill = base.isTransparent() ? juce::Colour(VW::BG_HIGH).withAlpha(0.5f)
+                                                        : juce::Colour(VW::BG_HIGH);
 
-    // Border
-    juce::Colour border = (on || down)
-        ? accent.withAlpha(0.8f)
-        : (highlighted ? juce::Colour(VW::BORDER_VIS) : juce::Colour(VW::BORDER_SUB));
-    g.setColour(border);
-    g.drawRoundedRectangle(b, 3.0f, 1.0f);
+    if (fill.getAlpha() > 0)
+    {
+        g.setColour(fill);
+        g.fillRoundedRectangle(b, 3.0f);
+    }
+
+    // Border — skip border entirely for transparent buttons
+    if (!base.isTransparent())
+    {
+        juce::Colour border = (on || down)
+            ? accent.withAlpha(0.8f)
+            : (highlighted ? juce::Colour(VW::BORDER_VIS) : juce::Colour(VW::BORDER_SUB));
+        g.setColour(border);
+        g.drawRoundedRectangle(b, 3.0f, 1.0f);
+    }
 
     // Top neon line when active
     if (on || down)

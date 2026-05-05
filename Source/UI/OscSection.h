@@ -2,7 +2,8 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 
-class OscSection : public juce::Component
+class OscSection : public juce::Component,
+                   private juce::Timer
 {
 public:
     OscSection(VoidWaveAudioProcessor& p, const juce::String& paramPrefix, juce::Colour accent);
@@ -15,9 +16,18 @@ private:
     juce::String prefix;
     juce::Colour accent;
 
+    // Wave shape selector buttons (SINE SAW SQR SPEC F.A F.E BS1 BS2 NSE)
+    static constexpr int N_WAVE = 7;  // SIN SAW SQR SPC F.A F.E BS1  (BS2+NSE replaced by SCAN)
+    juce::TextButton waveBtn[N_WAVE];
+    std::atomic<float>* pTable  = nullptr;
+
+    // SCAN toggle button
+    juce::TextButton scanBtn { "SCAN" };
+    std::atomic<float>* pWTMode = nullptr;
+
     juce::Slider  sPos, sCoarse, sFine, sLevel, sPan, sDetune;
     juce::Slider  sWidth, sPitchAtk, sPitchAmt;
-    juce::Slider  sTable;   // hidden, APVTS-bound; driven from WavetableDisplay
+    juce::Slider  sTable;   // hidden, APVTS-bound
     juce::ComboBox cUnison, cPhase, cWTMode;
 
     juce::Label lPos{"","POS"}, lCoarse{"","COARSE"}, lFine{"","FINE"},
@@ -30,6 +40,9 @@ private:
     std::unique_ptr<SlAtt> attPos, attCoarse, attFine, attLevel, attPan, attDetune, attTable;
     std::unique_ptr<SlAtt> attWidth, attPitchAtk, attPitchAmt;
     std::unique_ptr<CbAtt> attUnison, attPhase, attWTMode;
+
+    // Timer: sync button highlight to current APVTS table value
+    void timerCallback() override;
 
     void styleKnob(juce::Slider& s, juce::Label& l, int px);
     void styleCombo(juce::ComboBox& c, juce::Label& l);

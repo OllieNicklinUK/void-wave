@@ -143,27 +143,7 @@ FXSection::FXSection(VoidWaveAudioProcessor& p) : processor(p)
     applyReverbPreset(0);
 }
 
-void FXSection::paint(juce::Graphics& g)
-{
-    g.fillAll(juce::Colour(VW::BG_PANEL));
-    const int slotW = getWidth() / 4;
-    const char* labels[] = { "DISTORTION", "MODULATION", "DELAY", "REVERB" };
-    for (int i = 0; i < 4; ++i)
-    {
-        // Filled header bar per slot
-        g.setColour(ORANGE);
-        g.fillRect(i * slotW, 0, (i < 3 ? slotW - 1 : slotW), 14);
-        g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.5f, juce::Font::bold));
-        g.setColour(juce::Colour(0xffffffff));
-        g.drawText(labels[i], i * slotW, 0, slotW - 1, 14, juce::Justification::centred);
-        if (i < 3) {
-            g.setColour(juce::Colour(VW::BORDER_SUB));
-            g.drawVerticalLine(i * slotW + slotW - 1, 14.0f, static_cast<float>(getHeight()));
-        }
-    }
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawRect(getLocalBounds(), 1);
-}
+void FXSection::paint(juce::Graphics&) {}
 
 void FXSection::resized()
 {

@@ -90,16 +90,16 @@ INT_PARAMS = {k for k, v in DEFAULTS.items() if isinstance(v, int)}
 
 # ─── FX helpers ───────────────────────────────────────────────────────────────
 
-def dist(drive=0.4, tone=5000.0, mix=0.5):
+def dist(drive=0.35, tone=5000.0, mix=0.4):
     return {"fx1_param1": drive, "fx1_param2": tone, "fx1_param3": mix}
 
-def chorus(rate=0.8, depth=0.45, mix=0.4):
+def chorus(rate=0.8, depth=0.4, mix=0.28):
     return {"fx2_param1": rate, "fx2_param2": depth, "fx2_param3": mix}
 
-def delay(ms=375.0, feedback=0.35, mix=0.25):
+def delay(ms=375.0, feedback=0.32, mix=0.18):
     return {"fx3_param1": ms, "fx3_param2": feedback, "fx3_param3": mix}
 
-def reverb(size=0.6, damp=0.5, mix=0.3):
+def reverb(size=0.55, damp=0.55, mix=0.22):
     return {"fx4_param1": size, "fx4_param2": damp, "fx4_param4": mix}
 
 def mono(glide=0.0):

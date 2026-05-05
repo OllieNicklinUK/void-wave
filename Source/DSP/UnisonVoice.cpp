@@ -49,7 +49,7 @@ void UnisonVoice::triggerNote()
 
 void UnisonVoice::applyDetuneAndPan()
 {
-    float spreadCents = detune * 100.0f;
+    float spreadCents = detune * 200.0f;  // 0–200 cents spread (audible at any setting)
     for (int i = 0; i < numVoices; ++i)
     {
         float t = (numVoices > 1)

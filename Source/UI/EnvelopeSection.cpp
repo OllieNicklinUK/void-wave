@@ -97,7 +97,7 @@ EnvelopeSection::EnvelopeSection(VoidWaveAudioProcessor& p) : processor(p)
     sSus3.setComponentID("env3_sustain"); sHld3.setComponentID("env3_hold");
     sRel3.setComponentID("env3_release");
 
-    showEnv(0);
+    showEnv(1);   // default to AMP ENV (more useful at first open)
     startTimerHz(30);
 }
 
@@ -154,23 +154,9 @@ void EnvelopeSection::drawADSR(juce::Graphics& g, juce::Rectangle<float> area,
 void EnvelopeSection::paint(juce::Graphics& g)
 {
     const int W = getWidth(), pad = 6;
-    g.fillAll(juce::Colour(VW::BG_PANEL));
-    g.setColour(GREEN);
-    g.fillRect(0, 0, W, 14);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
-    g.setColour(juce::Colour(0xffffffff));
-    // Show which envelope is active in the header
-    const char* envName = (currentEnv == 0) ? "ENVELOPE  ·  FILTER" : "ENVELOPE  ·  AMP";
-    g.drawText(envName, 0, 0, W, 14, juce::Justification::centred);
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawRect(getLocalBounds(), 1);
 
-    // ADSR visualisation canvas
+    // ADSR visualisation canvas (no fill — PNG shows through)
     auto vizArea = juce::Rectangle<float>(pad, 38, W - 2*pad, 80);
-    g.setColour(juce::Colour(VW::BG_PANEL));
-    g.fillRoundedRectangle(vizArea, 3.0f);
-    g.setColour(juce::Colour(VW::BORDER_VIS));
-    g.drawRoundedRectangle(vizArea, 3.0f, 1.0f);
 
     // Grid
     g.setColour(GREEN.withAlpha(0.04f));

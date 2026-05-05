@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoidWave · Web Engine Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void-blue: #00f0ff;
+    --void-purple: #9d00ff;
+    --void-dark: #0a0a0f;
+    --void-panel: rgba(20, 20, 30, 0.7);
+    --void-border: rgba(0, 240, 255, 0.2);
+    --text-main: #e0e0ff;
+    --text-dim: #8a8aAA;
+    --glow: 0 0 15px rgba(0, 240, 255, 0.4);
+    --glow-intense: 0 0 25px rgba(157, 0, 255, 0.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: radial-gradient(circle at 50% 50%, #11111a 0%, #050508 100%);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* Glassmorphism background blur */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+') repeat;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    padding: 24px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--void-border);
+    background: linear-gradient(180deg, rgba(10,10,15,0.9) 0%, rgba(10,10,15,0) 100%);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    letter-spacing: 6px;
+    background: linear-gradient(90deg, var(--void-blue), var(--void-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: var(--glow);
+  }
+
+  .main-container {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    padding: 24px 40px;
+    z-index: 10;
+  }
+
+  /* PANEL STYLES */
+  .panel {
+    background: var(--void-panel);
+    border: 1px solid var(--void-border);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    color: var(--void-blue);
+    letter-spacing: 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* PRESET BROWSER */
+  .preset-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 8px;
+    max-height: 400px;
+  }
+
+  .preset-list::-webkit-scrollbar { width: 4px; }
+  .preset-list::-webkit-scrollbar-thumb { background: var(--void-blue); border-radius: 4px; }
+
+  .preset-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .preset-item:hover {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--void-blue);
+  }
+
+  .preset-item.active {
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.2), rgba(157, 0, 255, 0.2));
+    border-color: var(--void-blue);
+    box-shadow: var(--glow);
+  }
+
+  .preset-name { font-weight: 600; font-size: 14px; }
+  .preset-cat { font-size: 10px; color: var(--text-dim); background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+
+  /* SEQUENCER */
+  .sequencer-grid {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .step-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .step-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    transition: all 0.1s;
+  }
+  .step-indicator.active {
+    background: var(--void-blue);
+    box-shadow: var(--glow);
+  }
+
+  .step-btn {
+    width: 100%;
+    aspect-ratio: 1/2;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .step-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  .step-btn.on {
+    background: var(--void-purple);
+    border-color: var(--void-purple);
+    box-shadow: var(--glow-intense);
+  }
+
+  /* CONTROLS */
+  .controls-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--void-blue);
+    color: var(--void-blue);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .btn:hover, .btn.playing {
+    background: var(--void-blue);
+    color: #000;
+    box-shadow: var(--glow);
+  }
+
+  .knob-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .knob-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .knob-value {
+    font-size: 12px;
+    color: var(--void-blue);
+    font-weight: 600;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    background: transparent;
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: var(--void-blue);
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -6px;
+    box-shadow: var(--glow);
+  }
+
+  /* PIANO ROLL PREVIEW */
+  .piano-roll {
+    height: 150px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    margin-top: 10px;
+  }
+
+  .note-bar {
+    position: absolute;
+    height: 10px;
+    background: var(--void-blue);
+    border-radius: 4px;
+    box-shadow: var(--glow);
+    transition: opacity 0.1s;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">VOIDWAVE <span>WEB ENGINE</span></div>
+  <div style="color: var(--text-dim); font-size: 12px; display: flex; align-items: center; gap: 8px;">
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--void-blue);box-shadow:var(--glow);"></div>
+    AudioContext Active
+  </div>
+</header>
+
+<div class="main-container">
+  
+  <!-- PRESET BROWSER -->
+  <div class="panel">
+    <div class="panel-title">Presets (<span id="presetCount">0</span>)</div>
+    <input type="text" id="searchInput" placeholder="Search presets..." style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);color:white;padding:10px;border-radius:6px;font-family:inherit;font-size:12px;outline:none;">
+    <div class="preset-list" id="presetList">
+      <!-- Generated via JS -->
+      <div style="text-align:center; padding: 20px; color: var(--text-dim);">Loading presets.json...</div>
+    </div>
+  </div>
+
+  <!-- MAIN SEQUENCER -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    
+    <div class="panel">
+      <div class="controls-bar">
+        <button class="btn" id="playBtn">PLAY</button>
+        
+        <div class="knob-container">
+          <div class="knob-label">BPM</div>
+          <input type="range" id="bpmControl" min="60" max="200" value="128">
+          <div class="knob-value" id="bpmValue">128</div>
+        </div>
+
+        <div style="flex: 1;"></div>
+
+        <!-- Synth Live Tweaks -->
+        <div class="knob-container">
+          <div class="knob-label">Cutoff</div>
+          <input type="range" id="cutoffControl" min="20" max="10000" value="2000">
+          <div class="knob-value" id="cutoffValue">2000 Hz</div>
+        </div>
+        <div class="knob-container">
+          <div class="knob-label">Resonance</div>
+          <input type="range" id="resControl" min="0" max="20" value="2" step="0.1">
+          <div class="knob-value" id="resValue">2.0</div>
+        </div>
+      </div>
+
+      <div class="panel-title">Sequence (Demo Pattern)</div>
+      <div class="sequencer-grid" id="seqGrid">
+        <!-- Generated via JS -->
+      </div>
+    </div>
+
+    <div class="panel" style="flex: 1;">
+      <div class="panel-title">Currently Loaded: <span id="currentPresetName" style="color:white;">None</span></div>
+      <div style="font-size: 12px; color: var(--text-dim); margin-top: 10px; line-height: 1.6;" id="presetParamsDisplay">
+        Select a preset to view its engine parameters.
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // --- WEB AUDIO SYNTHESIS ENGINE ---
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  class VoidWaveSynth {
+    constructor(ctx) {
+      this.ctx = ctx;
+      this.masterGain = ctx.createGain();
+      this.masterGain.gain.value = 0.5;
+      this.masterGain.connect(ctx.destination);
+      this.currentParams = null;
+      this.filterCutoffMod = 2000;
+      this.filterResMod = 2;
+    }
+
+    setPreset(params) {
+      this.currentParams = params;
+      // Map VoidWave preset params to WebAudio
+      this.filterCutoffMod = params.filter_cutoff ? Math.min(10000, Math.max(20, params.filter_cutoff * 10)) : 2000;
+      this.filterResMod = params.filter_res !== undefined ? params.filter_res * 10 : 2;
+      
+      document.getElementById('cutoffControl').value = this.filterCutoffMod;
+      document.getElementById('cutoffValue').innerText = Math.round(this.filterCutoffMod) + ' Hz';
+      document.getElementById('resControl').value = this.filterResMod;
+      document.getElementById('resValue').innerText = this.filterResMod.toFixed(1);
+    }
+
+    getWaveform(tableIdx) {
+      // Very rough approximation of VoidWave wavetables
+      if (tableIdx === 0) return 'sine';
+      if (tableIdx === 1) return 'sawtooth';
+      if (tableIdx === 2) return 'square';
+      return 'triangle';
+    }
+
+    playNote(midiNote, time, duration = 0.2) {
+      if (!this.currentParams) return;
+      
+      const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+      
+      // Osc 1
+      const osc1 = this.ctx.createOscillator();
+      osc1.type = this.getWaveform(this.currentParams.osc1_table);
+      osc1.frequency.setValueAtTime(freq, time);
+
+      // Osc 2
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = this.getWaveform(this.currentParams.osc2_table);
+      const coarse = this.currentParams.osc2_coarse || 0;
+      osc2.frequency.setValueAtTime(freq * Math.pow(2, coarse / 12), time);
+
+      // Mixer
+      const mixRatio = this.currentParams.osc_mix !== undefined ? this.currentParams.osc_mix : 0.5;
+      const gain1 = this.ctx.createGain(); gain1.gain.value = 1.0 - mixRatio;
+      const gain2 = this.ctx.createGain(); gain2.gain.value = mixRatio;
+
+      // Filter
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      
+      // Envelope
+      const attack = Math.max(0.001, this.currentParams.env2_attack || 0.05);
+      const decay = Math.max(0.01, this.currentParams.env2_decay || 0.3);
+      const sustain = this.currentParams.env2_sustain !== undefined ? this.currentParams.env2_sustain : 0.5;
+      const release = Math.max(0.01, this.currentParams.env2_release || 0.3);
+
+      const ampEnv = this.ctx.createGain();
+      ampEnv.gain.setValueAtTime(0, time);
+      ampEnv.gain.linearRampToValueAtTime(1.0, time + attack);
+      ampEnv.gain.linearRampToValueAtTime(sustain, time + attack + decay);
+      ampEnv.gain.setValueAtTime(sustain, time + duration);
+      ampEnv.gain.linearRampToValueAtTime(0, time + duration + release);
+
+      // Filter Envelope implementation (approximated)
+      filter.Q.value = this.filterResMod;
+      filter.frequency.setValueAtTime(this.filterCutoffMod * 0.1, time);
+      filter.frequency.exponentialRampToValueAtTime(this.filterCutoffMod, time + attack);
+      filter.frequency.exponentialRampToValueAtTime(this.filterCutoffMod * 0.3, time + attack + decay);
+
+      // Connections
+      osc1.connect(gain1);
+      osc2.connect(gain2);
+      gain1.connect(filter);
+      gain2.connect(filter);
+      filter.connect(ampEnv);
+      ampEnv.connect(this.masterGain);
+
+      // Start & Stop
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + duration + release + 0.1);
+      osc2.stop(time + duration + release + 0.1);
+    }
+  }
+
+  const synth = new VoidWaveSynth(audioCtx);
+
+  // --- APP LOGIC ---
+  let allPresets = [];
+  let presets = [];
+  let isPlaying = false;
+  let currentStep = 0;
+  let nextNoteTime = 0;
+  let bpm = 128;
+  let timerID = null;
+
+  // Simple demo acid pattern
+  const pattern = [
+    { note: 36, on: true }, { note: 36, on: false }, { note: 48, on: true }, { note: 46, on: true },
+    { note: 36, on: true }, { note: 36, on: false }, { note: 43, on: true }, { note: 36, on: false },
+    { note: 36, on: true }, { note: 48, on: true }, { note: 36, on: false }, { note: 46, on: true },
+    { note: 36, on: true }, { note: 36, on: false }, { note: 41, on: true }, { note: 43, on: true },
+  ];
+
+  // DOM Elements
+  const presetListEl = document.getElementById('presetList');
+  const seqGridEl = document.getElementById('seqGrid');
+  const playBtn = document.getElementById('playBtn');
+
+  // Build Sequencer UI
+  for(let i=0; i<16; i++) {
+    const col = document.createElement('div');
+    col.className = 'step-col';
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'step-indicator';
+    indicator.id = 'ind-' + i;
+    
+    const btn = document.createElement('div');
+    btn.className = 'step-btn' + (pattern[i].on ? ' on' : '');
+    btn.onclick = () => {
+      pattern[i].on = !pattern[i].on;
+      btn.className = 'step-btn' + (pattern[i].on ? ' on' : '');
+    };
+
+    col.appendChild(indicator);
+    col.appendChild(btn);
+    seqGridEl.appendChild(col);
+  }
+
+  // Load Presets
+  fetch('presets.json')
+    .then(res => res.json())
+    .then(data => {
+      allPresets = data;
+      presets = data;
+      document.getElementById('presetCount').innerText = presets.length;
+      renderPresets();
+      if(presets.length > 0) selectPreset(0);
+    })
+    .catch(err => {
+      presetListEl.innerHTML = '<div style="color:red;padding:20px;">Error loading presets. Make sure you are running via a local server (e.g. VSCode Live Server) so fetch() works.</div>';
+    });
+
+  function renderPresets() {
+    presetListEl.innerHTML = '';
+    presets.forEach((p, idx) => {
+      const el = document.createElement('div');
+      el.className = 'preset-item';
+      el.innerHTML = `
+        <span class="preset-name">${p.name}</span>
+        <span class="preset-cat">${p.category || 'SYNTH'}</span>
+      `;
+      el.onclick = () => {
+        document.querySelectorAll('.preset-item').forEach(e => e.classList.remove('active'));
+        el.classList.add('active');
+        selectPreset(idx);
+      };
+      presetListEl.appendChild(el);
+    });
+  }
+
+  function selectPreset(idx) {
+    const p = presets[idx];
+    synth.setPreset(p.params);
+    document.getElementById('currentPresetName').innerText = p.name + (p.sub ? ' ('+p.sub+')' : '');
+    
+    // Display params
+    let html = `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">`;
+    for(const [k, v] of Object.entries(p.params)) {
+      html += `<div><span style="color:#00f0ff">${k}</span>: <span style="color:#fff">${v}</span></div>`;
+    }
+    html += `</div>`;
+    document.getElementById('presetParamsDisplay').innerHTML = html;
+  }
+
+  document.getElementById('searchInput').oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    presets = allPresets.filter(p => p.name.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q)));
+    document.getElementById('presetCount').innerText = presets.length;
+    renderPresets();
+  };
+
+  // Live Tweaks
+  document.getElementById('cutoffControl').oninput = (e) => {
+    synth.filterCutoffMod = parseFloat(e.target.value);
+    document.getElementById('cutoffValue').innerText = Math.round(synth.filterCutoffMod) + ' Hz';
+  };
+  document.getElementById('resControl').oninput = (e) => {
+    synth.filterResMod = parseFloat(e.target.value);
+    document.getElementById('resValue').innerText = synth.filterResMod.toFixed(1);
+  };
+  document.getElementById('bpmControl').oninput = (e) => {
+    bpm = parseInt(e.target.value);
+    document.getElementById('bpmValue').innerText = bpm;
+  };
+
+  // Sequencer Logic
+  function scheduleNote() {
+    const secondsPerBeat = 60.0 / bpm;
+    // 16th notes = 0.25 beats
+    const secondsPerStep = secondsPerBeat * 0.25;
+
+    while (nextNoteTime < audioCtx.currentTime + 0.1) {
+      const step = pattern[currentStep];
+      
+      // Visual scheduling
+      const stepIdx = currentStep;
+      setTimeout(() => {
+        for(let i=0; i<16; i++) document.getElementById('ind-'+i).classList.remove('active');
+        document.getElementById('ind-'+stepIdx).classList.add('active');
+      }, (nextNoteTime - audioCtx.currentTime) * 1000);
+
+      if (step.on) {
+        synth.playNote(step.note, nextNoteTime, secondsPerStep * 0.8);
+      }
+
+      nextNoteTime += secondsPerStep;
+      currentStep++;
+      if (currentStep >= 16) currentStep = 0;
+    }
+    timerID = requestAnimationFrame(scheduleNote);
+  }
+
+  playBtn.onclick = () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      playBtn.innerText = 'STOP';
+      playBtn.classList.add('playing');
+      currentStep = 0;
+      nextNoteTime = audioCtx.currentTime + 0.05;
+      scheduleNote();
+    } else {
+      playBtn.innerText = 'PLAY';
+      playBtn.classList.remove('playing');
+      cancelAnimationFrame(timerID);
+      for(let i=0; i<16; i++) document.getElementById('ind-'+i).classList.remove('active');
+    }
+  };
+
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "VoidWavePresets.h"
 
 static const juce::Colour AMBER { VW::NEON_AMBER };
 
@@ -31,7 +32,7 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     , presetBrowser(p)
 {
     setLookAndFeel(&lookAndFeel);
-    setSize(1100, 620);
+    setSize(1280, 760);
 
     addAndMakeVisible(osc1Section);
     addAndMakeVisible(osc2Section);
@@ -45,7 +46,8 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
 
     // ── Preset bar ──────────────────────────────────────────────────────
     auto styleNavBtn = [](juce::TextButton& b) {
-        b.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
+        b.setColour(juce::TextButton::buttonColourId,  juce::Colours::transparentBlack);
+        b.setColour(juce::TextButton::buttonOnColourId,juce::Colours::transparentBlack);
         b.setColour(juce::TextButton::textColourOffId, AMBER);
     };
     styleNavBtn(prevBtn); styleNavBtn(nextBtn);
@@ -61,16 +63,16 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     addAndMakeVisible(nextBtn);
 
     // Preset name button — click to open the three-column browser
-    presetNameBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BG_RAISED));
-    presetNameBtn.setColour(juce::TextButton::textColourOffId, AMBER);
-    presetNameBtn.setColour(juce::TextButton::textColourOnId,  AMBER);
-    presetNameBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(VW::BG_RAISED));
+    presetNameBtn.setColour(juce::TextButton::buttonColourId,   juce::Colours::transparentBlack);
+    presetNameBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
+    presetNameBtn.setColour(juce::TextButton::textColourOffId,  AMBER);
+    presetNameBtn.setColour(juce::TextButton::textColourOnId,   AMBER);
     presetNameBtn.setClickingTogglesState(false);
     presetNameBtn.onClick = [this] { showBrowser(); };
     addAndMakeVisible(presetNameBtn);
 
     // IMPORT button
-    importBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
+    importBtn.setColour(juce::TextButton::buttonColourId,  juce::Colours::black);
     importBtn.setColour(juce::TextButton::textColourOffId, AMBER);
     importBtn.onClick = [this]
     {
@@ -122,7 +124,7 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
 
     // MIDI MAP button
     midiMapBtn.setClickingTogglesState(true);
-    midiMapBtn.setColour(juce::TextButton::buttonColourId,   juce::Colour(VW::BORDER_VIS));
+    midiMapBtn.setColour(juce::TextButton::buttonColourId,   juce::Colours::black);
     midiMapBtn.setColour(juce::TextButton::buttonOnColourId, AMBER.withAlpha(0.25f));
     midiMapBtn.setColour(juce::TextButton::textColourOffId,  juce::Colour(VW::TEXT_MID));
     midiMapBtn.setColour(juce::TextButton::textColourOnId,   AMBER);
@@ -141,14 +143,14 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     addAndMakeVisible(midiLearnOverlay);
 
     // Save preset button
-    saveBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
+    saveBtn.setColour(juce::TextButton::buttonColourId,  juce::Colours::black);
     saveBtn.setColour(juce::TextButton::textColourOffId, AMBER);
     saveBtn.onClick = [this] { onSavePreset(); };
     addAndMakeVisible(saveBtn);
 
     // Auto-play — standalone only (VST/AU has no use for it and causes launch noise)
     const bool isStandalone = audioProcessor.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
-    autoPlayBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BORDER_VIS));
+    autoPlayBtn.setColour(juce::TextButton::buttonColourId,  juce::Colours::black);
     autoPlayBtn.setColour(juce::TextButton::textColourOffId, AMBER);
     autoPlayBtn.onClick = [this] {
         audioProcessor.autoPlayEnabled = !audioProcessor.autoPlayEnabled;
@@ -274,70 +276,16 @@ void VoidWaveAudioProcessorEditor::paint(juce::Graphics& g)
     const int W = getWidth(), H = getHeight();
     const float fw = static_cast<float>(W), fh = static_cast<float>(H);
 
-    // ── Deep background ────────────────────────────────────────────────────────
-    g.fillAll(juce::Colour(VW::BG_DEEP));
-
-    // Ambient blob 1 — cyan tint, top-left
     {
-        juce::ColourGradient blob(juce::Colour(VW::NEON_CYAN).withAlpha(0.045f),
-                                   fw * 0.08f, fh * 0.28f,
-                                   juce::Colours::transparentBlack,
-                                   fw * 0.48f, fh * 0.28f, true);
-        g.setGradientFill(blob);
-        g.fillRect(0, 0, W, H);
-    }
-    // Ambient blob 2 — violet tint, bottom-right
-    {
-        juce::ColourGradient blob(juce::Colour(VW::NEON_VIOLET).withAlpha(0.035f),
-                                   fw * 0.85f, fh * 0.72f,
-                                   juce::Colours::transparentBlack,
-                                   fw * 0.55f, fh * 0.72f, true);
-        g.setGradientFill(blob);
-        g.fillRect(0, 0, W, H);
+        auto img = juce::ImageCache::getFromMemory(
+            VWPresets::flatui_png, VWPresets::flatui_pngSize);
+        if (img.isValid())
+            g.drawImage(img, 0, 0, W, H, 0, 0, img.getWidth(), img.getHeight());
+        else
+            g.fillAll(juce::Colours::black);
     }
 
-    // Subtle scanlines — every 2px
-    g.setColour(juce::Colour(0x0f000000));
-    for (int y = 0; y < H; y += 2)
-        g.drawHorizontalLine(y, 0.0f, fw);
-
-    // ── Top bar ────────────────────────────────────────────────────────────────
-    {
-        juce::ColourGradient tbg(juce::Colour(0xff0d1020), 0.0f, 0.0f,
-                                  juce::Colour(VW::BG_PANEL), 0.0f, 56.0f, false);
-        g.setGradientFill(tbg);
-        g.fillRect(0, 0, W, 56);
-    }
-    // Top bar bottom border with subtle amber glow
-    g.setColour(juce::Colour(VW::BORDER_VIS));
-    g.drawHorizontalLine(55, 0.0f, fw);
-    g.setColour(AMBER.withAlpha(0.06f));
-    g.fillRect(0, 54, W, 2);
-
-    // ── Logo ───────────────────────────────────────────────────────────────────
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 18.0f, juce::Font::bold));
-    // "VOID" — white with slight glow
-    g.setColour(juce::Colour(VW::TEXT_BRIGHT).withAlpha(0.9f));
-    g.drawText("VOID", 14, 8, 60, 20, juce::Justification::centredLeft);
-    // "WAVE" — neon amber with glow
-    g.setColour(AMBER.withAlpha(0.25f));
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 20.0f, juce::Font::bold));
-    g.drawText("WAVE", 55, 7, 62, 22, juce::Justification::centredLeft);
-    g.setColour(AMBER);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 18.0f, juce::Font::bold));
-    g.drawText("WAVE", 56, 8, 60, 20, juce::Justification::centredLeft);
-
-    // ── Section separators ─────────────────────────────────────────────────────
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawVerticalLine(260, 56.0f, 277.0f);
-    g.drawVerticalLine(521, 56.0f, 277.0f);
-    g.drawHorizontalLine(276, 0.0f, fw);
-
-    const int fW = 270, eW = 375, lW = 295;
-    g.drawVerticalLine(fW,           277.0f, fh - 79.0f);
-    g.drawVerticalLine(fW + 1 + eW,  277.0f, fh - 79.0f);
-    g.drawVerticalLine(fW+1+eW+1+lW, 277.0f, fh - 79.0f);
-    g.drawHorizontalLine(H - 79, 0.0f, fw);
+    // Logo and separators are in the PNG background — nothing to draw here
 }
 
 void VoidWaveAudioProcessorEditor::resized()
@@ -345,38 +293,42 @@ void VoidWaveAudioProcessorEditor::resized()
     const int W = getWidth();
 
     // Top bar layout
-    prevBtn      .setBounds(110,     18, 22, 20);
-    presetNameBtn.setBounds(136,     14, 470, 28);  // clickable preset name
-    nextBtn      .setBounds(610,     18, 22, 20);
-    importBtn    .setBounds(636,     16, 56,  24);
-    saveBtn      .setBounds(W - 250, 16, 56,  24);
-    midiMapBtn   .setBounds(W - 190, 16, 62,  24);
-    autoPlayBtn  .setBounds(W - 125, 16, 56,  24);
+    // Preset group: prevBtn(22) + 4 + presetName(470) + 4 + nextBtn(22) = 522px, centred
+    {
+        const int gW = 522, gX = (getWidth() - gW) / 2;
+        prevBtn      .setBounds(gX,          18, 22,  20);
+        presetNameBtn.setBounds(gX + 26,     14, 470, 28);
+        nextBtn      .setBounds(gX + 500,    18, 22,  20);
+    }
+    importBtn    .setBounds(W - 316, 16, 56,  24);  // next to SAVE
+    saveBtn      .setBounds(W - 256, 16, 56,  24);
+    midiMapBtn   .setBounds(W - 192, 16, 62,  24);
+    autoPlayBtn  .setBounds(W - 126, 16, 56,  24);
     noteLabel    .setBounds(W - 66,  12, 58,  28);
 
     midiLearnOverlay.setBounds(getLocalBounds());
     presetBrowser   .setBounds(getLocalBounds());
 
-    // Grid layout
-    const int TOP = 56, FX_H = 79;
-    const int ROW1  = 265;
-    const int ROW23 = getHeight() - TOP - 1 - ROW1 - 1 - FX_H;  // combined middle
+    // Grid layout — 1280×760
+    const int TOP = 56, FX_H = 84;
+    const int ROW1  = 310;
+    const int ROW23 = getHeight() - TOP - 1 - ROW1 - 1 - FX_H;
     const int yFX   = getHeight() - FX_H;
     const int y1    = TOP;
     const int y2    = y1 + ROW1 + 1;
 
-    // Row 1: OSC1 | OSC2 | Wavetable
-    osc1Section.setBounds(0,   y1, 260, ROW1);
-    osc2Section.setBounds(261, y1, 260, ROW1);
-    wtDisplay  .setBounds(522, y1, W - 522, ROW1);
+    // Row 1: OSC1 (280) | OSC2 (280) | Wavetable (rest)
+    osc1Section.setBounds(0,   y1, 280, ROW1);
+    osc2Section.setBounds(281, y1, 280, ROW1);
+    wtDisplay  .setBounds(562, y1, W - 562, ROW1);
 
-    // Row 2: Filter | Envelope | LFO | Macro  (ModMatrix hidden — moved below FX later)
-    const int fW = 270, eW = 375, lW = 295, mW = W - fW - eW - lW - 3;
+    // Row 2: Filter (290) | Envelope (410) | LFO (330) | Macro (rest)
+    const int fW = 290, eW = 410, lW = 330, mW = W - fW - eW - lW - 3;
     filterSection.setBounds(0,           y2, fW, ROW23);
     envSection   .setBounds(fW+1,        y2, eW, ROW23);
     lfoSection   .setBounds(fW+1+eW+1,   y2, lW, ROW23);
     macroSection .setBounds(fW+1+eW+1+lW+1, y2, mW, ROW23);
-    modMatrix    .setVisible(false);   // will appear below FX in a future session
+    modMatrix    .setVisible(false);
 
     fxSection.setBounds(0, yFX, W, FX_H);
 }

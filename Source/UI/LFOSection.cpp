@@ -112,8 +112,10 @@ void LFOSection::showLFO(int idx)
     currentLFO = idx;
     auto sv = [](std::initializer_list<juce::Component*> cs, bool v)
     { for (auto* c : cs) c->setVisible(v); };
-    sv({&sRate1,&sDepth1,&sPhase1,&sFade1,&sSyncDiv1,&lRate1,&lDepth1,&lPhase1,&lFade1,&lSyncDiv1,&cShape1,&lShape1,&cTrig1,&lTrig1,&tSync1}, idx==0);
-    sv({&sRate2,&sDepth2,&sPhase2,&sFade2,&sSyncDiv2,&lRate2,&lDepth2,&lPhase2,&lFade2,&lSyncDiv2,&cShape2,&lShape2,&cTrig2,&lTrig2,&tSync2}, idx==1);
+    sv({&sRate1,&sDepth1,&sPhase1,&sFade1,&lRate1,&lDepth1,&lPhase1,&lFade1,&cShape1,&lShape1,&cTrig1,&lTrig1,&tSync1}, idx==0);
+    sv({&sRate2,&sDepth2,&sPhase2,&sFade2,&lRate2,&lDepth2,&lPhase2,&lFade2,&cShape2,&lShape2,&cTrig2,&lTrig2,&tSync2}, idx==1);
+    // DIV knobs kept in APVTS but hidden
+    sv({&sSyncDiv1,&lSyncDiv1,&sSyncDiv2,&lSyncDiv2}, false);
     for (int i=0;i<2;++i) tabBtns[i].setToggleState(i==idx, juce::dontSendNotification);
     resized(); repaint();
 }
@@ -138,10 +140,6 @@ float LFOSection::lfoSample(int shape, float phase)
 void LFOSection::drawLFOPreview(juce::Graphics& g, juce::Rectangle<int> bounds) const
 {
     auto r = bounds.toFloat();
-    g.setColour(juce::Colour(VW::BG_PANEL));
-    g.fillRoundedRectangle(r, 3.0f);
-    g.setColour(juce::Colour(VW::BORDER_VIS));
-    g.drawRoundedRectangle(r, 3.0f, 1.0f);
 
     int shape = 0;
     auto* pS = currentLFO == 0 ? pShape1 : pShape2;
@@ -186,14 +184,6 @@ void LFOSection::drawLFOPreview(juce::Graphics& g, juce::Rectangle<int> bounds) 
 
 void LFOSection::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(VW::BG_PANEL));
-    g.setColour(PURPLE);
-    g.fillRect(0, 0, getWidth(), 14);
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
-    g.setColour(juce::Colour(0xffffffff));
-    g.drawText("LFO", 0, 0, getWidth(), 14, juce::Justification::centred);
-    g.setColour(juce::Colour(VW::BORDER_SUB));
-    g.drawRect(getLocalBounds(), 1);
 
     // Animated LFO preview canvas
     const int pad = 6;
@@ -224,16 +214,14 @@ void LFOSection::resized()
     lT.setBounds(pad+cw+pad,   70, cw - 30, 10); cT.setBounds(pad+cw+pad,   80, cw - 32, 16);
     tS.setBounds(W - pad - 28, 80, 28, 16);
 
-    // 5 mini knobs
-    const int Km = 28;
-    juce::Slider* ks[] = { currentLFO==0?&sRate1:&sRate2,    currentLFO==0?&sDepth1:&sDepth2,
-                            currentLFO==0?&sPhase1:&sPhase2,  currentLFO==0?&sFade1:&sFade2,
-                            currentLFO==0?&sSyncDiv1:&sSyncDiv2 };
-    juce::Label*  ls[] = { currentLFO==0?&lRate1:&lRate2,    currentLFO==0?&lDepth1:&lDepth2,
-                            currentLFO==0?&lPhase1:&lPhase2,  currentLFO==0?&lFade1:&lFade2,
-                            currentLFO==0?&lSyncDiv1:&lSyncDiv2 };
-    int kw = (W - 2*pad) / 5;
-    for (int i = 0; i < 5; ++i)
+    // 4 knobs (DIV removed) — bigger at Km=38
+    const int Km = 38;
+    juce::Slider* ks[] = { currentLFO==0?&sRate1:&sRate2,   currentLFO==0?&sDepth1:&sDepth2,
+                            currentLFO==0?&sPhase1:&sPhase2, currentLFO==0?&sFade1:&sFade2 };
+    juce::Label*  ls[] = { currentLFO==0?&lRate1:&lRate2,   currentLFO==0?&lDepth1:&lDepth2,
+                            currentLFO==0?&lPhase1:&lPhase2, currentLFO==0?&lFade1:&lFade2 };
+    int kw = (W - 2*pad) / 4;
+    for (int i = 0; i < 4; ++i)
     {
         int x = pad + i*kw + (kw-Km)/2;
         ks[i]->setBounds(x, 100, Km, Km);

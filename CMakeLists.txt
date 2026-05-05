@@ -15,6 +15,7 @@ juce_add_binary_data(VoidWave_Presets
     NAMESPACE  VWPresets
     HEADER_NAME "VoidWavePresets.h"
     SOURCES    ${PRESET_SOURCES}
+             "${CMAKE_SOURCE_DIR}/Resources/flat-ui.png"
 )
 
 juce_add_plugin(VoidWave
@@ -49,6 +50,13 @@ target_sources(VoidWave PRIVATE
     Source/DSP/FXChain/Chorus.cpp
     Source/DSP/FXChain/Delay.cpp
     Source/DSP/FXChain/Reverb.cpp
+    Source/DSP/FXChain/Peverb/AllPassFilter.cpp
+    Source/DSP/FXChain/Peverb/Delay.cpp
+    Source/DSP/FXChain/Peverb/EarlyReflections.cpp
+    Source/DSP/FXChain/Peverb/LateReverb.cpp
+    Source/DSP/FXChain/Peverb/Nested.cpp
+    Source/DSP/FXChain/Peverb/Processor.cpp
+    Source/DSP/FXChain/Peverb/Wrap.cpp
 
     Source/UI/LookAndFeel.cpp
     Source/UI/OscSection.cpp
