@@ -55,6 +55,13 @@ struct SynthParamSnapshot
     float      filterDrive    = 0.0f;
     float      filterKeyTrack = 0.0f;
     float      filterVelTrack = 0.0f;
+    int        filterRoute    = 0;  // 0=Both, 1=OSC1 only, 2=OSC2 only
+
+    // ── Sub oscillator + noise ──────────────────
+    float subLevel   = 0.0f;
+    int   subOctave  = 0;     // 0 = -1 oct, 1 = -2 oct
+    float noiseLevel = 0.0f;
+    float noiseColor = 0.5f;  // 0=dark, 1=white
 
     // ── ENV 1 (→ filter cutoff) ────────────────
     float env1Attack   = 0.01f;
@@ -146,6 +153,18 @@ struct Voice
     // Pre-allocated render buffers
     std::vector<float> tmpL, tmpR, tmpL2, tmpR2;
 
+    // ── Sub osc + noise state ──────────────────────────────────────────────
+    float subPhase  = 0.0f;
+    float noiseLP   = 0.0f;
+
+    // ── Anti-click ─────────────────────────────────────────────────────────
+    float antiClickGain = 0.0f;  // ramps 0→1 at note start; applied before filter
+    float stealFade     = 1.0f;  // ramps 1→0 when steal queued; applied to output gain
+    bool  hasPending    = false;  // true while waiting for steal fade to finish
+    int   pendingNote   = -1;
+    float pendingVel    = 0.0f;
+    bool  pendingGlide  = false;
+
     // ── Analogue imperfection state ────────────────────────────────────────
     // Pitch drift: brownian random walk, ±1.5 cents max
     float pitchDrift    = 0.0f;
@@ -214,6 +233,10 @@ private:
     Voice* findFreeVoice();
     Voice* stealVoice();
     void   applyParamsToVoice(Voice& v, const SynthParamSnapshot& p) const;
+    void   activateVoice(Voice& v, int note, float vel, bool shouldGlide);
+
+    float  antiClickRate = 0.0f;   // per-sample: ramps antiClickGain 0→1 over 5ms
+    float  stealFadeRate = 0.0f;   // per-sample: ramps stealFade 1→0 over 3ms
 
     static float midiNoteToHz(int note, float pitchBendSemis = 0.0f,
                                float masterTuneCents = 0.0f);

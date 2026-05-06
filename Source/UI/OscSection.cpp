@@ -69,6 +69,19 @@ OscSection::OscSection(VoidWaveAudioProcessor& p,
     };
     addAndMakeVisible(scanBtn);
 
+    // LOAD WAV button — top-right of section header
+    loadWavBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(VW::BG_RAISED));
+    loadWavBtn.setColour(juce::TextButton::textColourOffId, acc.withAlpha(0.7f));
+    loadWavBtn.onClick = [this] { triggerWavLoad(); };
+    addAndMakeVisible(loadWavBtn);
+
+    // Section title label — "OSCILLATOR 1" / "OSCILLATOR 2" in muted style
+    titleLabel.setText(pfx == "osc1" ? "OSCILLATOR 1" : "OSCILLATOR 2",
+                       juce::dontSendNotification);
+    titleLabel.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
+    titleLabel.setColour(juce::Label::textColourId, juce::Colours::black);
+    addAndMakeVisible(titleLabel);
+
     startTimerHz(30);
 
     auto iniC = [&](juce::ComboBox& c, juce::Label& l)
@@ -122,6 +135,30 @@ OscSection::OscSection(VoidWaveAudioProcessor& p,
     sPan   .setComponentID(pfx + "_pan");      sDetune.setComponentID(pfx + "_detune");
 }
 
+void OscSection::triggerWavLoad()
+{
+    fileChooser = std::make_shared<juce::FileChooser>(
+        "Load Single-Cycle WAV",
+        juce::File::getSpecialLocation(juce::File::userMusicDirectory),
+        "*.wav;*.aiff;*.aif");
+
+    fileChooser->launchAsync(
+        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [this](const juce::FileChooser& fc)
+        {
+            auto f = fc.getResult();
+            if (!f.existsAsFile()) return;
+            int userSlot = (prefix == "osc1") ? 0 : 1;
+            if (processor.wavetableBank.importUserTable(userSlot, f))
+            {
+                int tableIdx = 9 + userSlot;
+                if (auto* param = processor.apvts.getParameter(prefix + "_table"))
+                    param->setValueNotifyingHost(
+                        param->convertTo0to1(static_cast<float>(tableIdx)));
+            }
+        });
+}
+
 void OscSection::paint(juce::Graphics&) {}
 
 void OscSection::timerCallback()
@@ -149,11 +186,29 @@ void OscSection::timerCallback()
         scanBtn.setColour(juce::TextButton::textColourOffId,
                           isScan ? accent : juce::Colour(VW::TEXT_MID));
     }
+
+    // Light up LOAD WAV button when a user-imported slot is selected
+    if (pTable)
+    {
+        int cur = static_cast<int>(std::round(pTable->load()));
+        int userSlot = (prefix == "osc1") ? 9 : 10;
+        bool userActive = (cur == userSlot);
+        loadWavBtn.setColour(juce::TextButton::buttonColourId,
+            userActive ? accent.withAlpha(0.22f) : juce::Colour(VW::BG_RAISED));
+        loadWavBtn.setColour(juce::TextButton::textColourOffId,
+            userActive ? accent : accent.withAlpha(0.55f));
+    }
 }
 
 void OscSection::resized()
 {
     const int W = getWidth(), pad = 8;
+
+    // Section title — left of header strip (bumped up 4px)
+    titleLabel.setBounds(pad, 0, W - 74, 11);
+
+    // LOAD WAV — top-right corner of the header strip
+    loadWavBtn.setBounds(W - 66, -2, 58, 13);
 
     // Combos start immediately below header
     int cw = (W - 3 * pad) / 2;

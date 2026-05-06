@@ -166,6 +166,21 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
     addAndMakeVisible(autoPlayBtn);
     addAndMakeVisible(noteLabel);
 
+    // Master volume knob — top bar, 250px from left
+    sMaster.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    sMaster.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    sMaster.setColour(juce::Slider::thumbColourId,               AMBER);
+    sMaster.setColour(juce::Slider::rotarySliderFillColourId,    AMBER);
+    sMaster.setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colour(VW::BORDER_VIS));
+    sMaster.setComponentID("master_volume");
+    addAndMakeVisible(sMaster);
+    lMaster.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::plain));
+    lMaster.setColour(juce::Label::textColourId, juce::Colour(VW::TEXT_MID));
+    lMaster.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(lMaster);
+    attMaster = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.apvts, "master_volume", sMaster);
+
     // Build preset list. In VST/AU the DAW already restored state via setStateInformation.
     presetBrowser.refresh();
     if (isStandalone)
@@ -284,8 +299,6 @@ void VoidWaveAudioProcessorEditor::paint(juce::Graphics& g)
         else
             g.fillAll(juce::Colours::black);
     }
-
-    // Logo and separators are in the PNG background — nothing to draw here
 }
 
 void VoidWaveAudioProcessorEditor::resized()
@@ -300,6 +313,10 @@ void VoidWaveAudioProcessorEditor::resized()
         presetNameBtn.setBounds(gX + 26,     14, 470, 28);
         nextBtn      .setBounds(gX + 500,    18, 22,  20);
     }
+    // Master volume — 250px from left, vertically centred in top bar
+    sMaster.setBounds(250, 10, 36, 36);
+    lMaster.setBounds(290, 23, 50, 10);  // right of knob, vertically centred
+
     importBtn    .setBounds(W - 316, 16, 56,  24);  // next to SAVE
     saveBtn      .setBounds(W - 256, 16, 56,  24);
     midiMapBtn   .setBounds(W - 192, 16, 62,  24);

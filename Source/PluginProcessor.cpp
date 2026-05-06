@@ -83,6 +83,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout VoidWaveAudioProcessor::crea
         "filter_keytrack", "Key Tracking",      0.0f, 2.0f, 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "filter_veltrack", "Vel Tracking",      0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        "filter_route", "Filter Route",         0, 2, 0));  // 0=Both, 1=OSC1, 2=OSC2
+
+    // Sub oscillator + noise
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "sub_level",   "Sub Level",   0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        "sub_octave",  "Sub Octave",  0, 1,   0));   // 0 = -1 oct, 1 = -2 oct
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "noise_level", "Noise Level", 0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "noise_color", "Noise Color", 0.0f, 1.0f, 0.5f));  // 0=dark LP, 1=white
 
     auto makeEnvParams = [&](const juce::String& px, const juce::String& nm, bool hasDepth)
     {
@@ -138,7 +150,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout VoidWaveAudioProcessor::crea
             px + "_fade",       nm + " Fade In",
             juce::NormalisableRange<float>(0.0f, 10.0f, 0.0f, 0.3f), 0.0f));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(
-            px + "_depth",      nm + " Depth",       -1.0f, 1.0f, 0.5f));
+            px + "_depth",      nm + " Depth",       -1.0f, 1.0f, 0.0f));
     };
 
     makeLfoParams("lfo1", "LFO 1");
@@ -267,6 +279,12 @@ void VoidWaveAudioProcessor::cacheParamPointers()
     p_filter_drive    = t->getRawParameterValue("filter_drive");
     p_filter_keytrack = t->getRawParameterValue("filter_keytrack");
     p_filter_veltrack = t->getRawParameterValue("filter_veltrack");
+    p_filter_route    = t->getRawParameterValue("filter_route");
+
+    p_sub_level       = t->getRawParameterValue("sub_level");
+    p_sub_octave      = t->getRawParameterValue("sub_octave");
+    p_noise_level     = t->getRawParameterValue("noise_level");
+    p_noise_color     = t->getRawParameterValue("noise_color");
 
     p_env1_attack     = t->getRawParameterValue("env1_attack");
     p_env1_decay      = t->getRawParameterValue("env1_decay");
@@ -404,6 +422,12 @@ SynthParamSnapshot VoidWaveAudioProcessor::buildSnapshot() const
     p.filterDrive    = p_filter_drive->load();
     p.filterKeyTrack = p_filter_keytrack->load();
     p.filterVelTrack = p_filter_veltrack->load();
+    p.filterRoute    = p_filter_route ? static_cast<int>(p_filter_route->load()) : 0;
+
+    p.subLevel   = p_sub_level   ? p_sub_level->load()                        : 0.0f;
+    p.subOctave  = p_sub_octave  ? static_cast<int>(p_sub_octave->load())     : 0;
+    p.noiseLevel = p_noise_level ? p_noise_level->load()                      : 0.0f;
+    p.noiseColor = p_noise_color ? p_noise_color->load()                      : 0.5f;
 
     p.env1Attack  = p_env1_attack->load();
     p.env1Decay   = p_env1_decay->load();
@@ -490,24 +514,47 @@ void VoidWaveAudioProcessor::updateFXFromParams()
     fxReverb.setSize      (p_fx4_param1->load());
     fxReverb.setDamping   (p_fx4_param2->load());
     fxReverb.setPredelay  (p_fx4_param3->load());
-    fxReverb.setMix       (p_fx4_param4->load());
+    {
+        float base  = p_fx4_param4->load();
+        float space = p_macro[2] ? p_macro[2]->load() : 0.0f;   // macro3 = SPACE
+        fxReverb.setMix(juce::jmin(1.0f, base + space * (1.0f - base)));
+    }
 }
 
 // ── Dev auto-play ─────────────────────────────────────────────────────────────
 
 void VoidWaveAudioProcessor::tickAutoPlay(int numSamples)
 {
-    juce::ignoreUnused(numSamples);
-
     if (!autoPlayEnabled)
     {
-        autoPlayCurNote = -1;   // reset so re-enabling fires the note again
+        if (autoPlayCurNote >= 0) voiceManager.noteOff(autoPlayCurNote);
+        autoPlayCurNote = -1;
+        autoPlayCounter = 0;
+        autoPlayNoteIdx = 0;
         return;
     }
 
-    if (autoPlayCurNote < 0)
+    // C minor pentatonic across two octaves — good for testing filter, env, and range
+    static const int seq[] = { 48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72, 67, 63, 60, 58, 55 };
+    static constexpr int SEQ_LEN = 16;
+
+    autoPlayCounter += numSamples;
+
+    // Note off at 80% of step
+    const int stepSamples    = static_cast<int>(getSampleRate() * 0.35);   // ~170bpm 8th notes
+    const int noteOnSamples  = static_cast<int>(stepSamples * 0.78);
+
+    if (autoPlayCurNote >= 0 && autoPlayCounter >= noteOnSamples)
     {
-        autoPlayCurNote = 48;   // C3 — held continuously
+        voiceManager.noteOff(autoPlayCurNote);
+        autoPlayCurNote = -1;
+    }
+
+    if (autoPlayCounter >= stepSamples)
+    {
+        autoPlayCounter = 0;
+        autoPlayCurNote = seq[autoPlayNoteIdx % SEQ_LEN];
+        autoPlayNoteIdx = (autoPlayNoteIdx + 1) % SEQ_LEN;
         voiceManager.noteOn(autoPlayCurNote, 0.75f);
     }
 }

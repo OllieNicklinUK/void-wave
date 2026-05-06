@@ -63,7 +63,8 @@ EnvelopeSection::EnvelopeSection(VoidWaveAudioProcessor& p) : processor(p)
 
     aAtk1 = std::make_unique<SlAtt>(t,"env1_attack",  sAtk1); aDcy1 = std::make_unique<SlAtt>(t,"env1_decay",   sDcy1);
     aSus1 = std::make_unique<SlAtt>(t,"env1_sustain", sSus1); aHld1 = std::make_unique<SlAtt>(t,"env1_hold",    sHld1);
-    aRel1 = std::make_unique<SlAtt>(t,"env1_release", sRel1); aDep1 = std::make_unique<SlAtt>(t,"env1_depth",   sDep1);
+    aRel1 = std::make_unique<SlAtt>(t,"env1_release", sRel1);
+    // env1_depth attachment moved to FilterSection (knob lives next to RES)
     aCrv1 = std::make_unique<CbAtt>(t,"env1_curve",   cCrv1);
 
     aAtk2 = std::make_unique<SlAtt>(t,"env2_attack",  sAtk2); aDcy2 = std::make_unique<SlAtt>(t,"env2_decay",   sDcy2);
@@ -97,24 +98,27 @@ EnvelopeSection::EnvelopeSection(VoidWaveAudioProcessor& p) : processor(p)
     sSus3.setComponentID("env3_sustain"); sHld3.setComponentID("env3_hold");
     sRel3.setComponentID("env3_release");
 
+    // Section title
+    sectionTitle.setText("ENVELOPE", juce::dontSendNotification);
+    sectionTitle.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
+    sectionTitle.setColour(juce::Label::textColourId, GREEN);
+    addAndMakeVisible(sectionTitle);
+
     showEnv(1);   // default to AMP ENV (more useful at first open)
     startTimerHz(30);
 }
 
 void EnvelopeSection::showEnv(int idx)
 {
-    currentEnv = idx;
-    auto setVis = [](std::initializer_list<juce::Component*> comps, bool v)
-    { for (auto* c : comps) c->setVisible(v); };
-
-    // Clamp to 2 visible envs — ENV 3 controls always hidden
-    idx = juce::jlimit(0, 1, idx);
-    setVis({&sAtk1,&sDcy1,&sSus1,&sHld1,&sRel1,&sDep1,&lAtk1,&lDcy1,&lSus1,&lHld1,&lRel1,&lDep1,&cCrv1,&lCrv1}, idx==0);
-    setVis({&sAtk2,&sDcy2,&sSus2,&sHld2,&sRel2,&lAtk2,&lDcy2,&lSus2,&lHld2,&lRel2,&cCrv2,&lCrv2}, idx==1);
-    // ENV 3 always hidden
-    setVis({&sAtk3,&sDcy3,&sSus3,&sHld3,&sRel3,&lAtk3,&lDcy3,&lSus3,&lHld3,&lRel3,&cCrv3,&lCrv3}, false);
-    for (int i = 0; i < 2; ++i) tabBtns[i].setToggleState(i == idx, juce::dontSendNotification);
-    resized();
+    currentEnv = juce::jlimit(0, 1, idx);
+    // Tabs now only control which env is shown in the viz — all knobs always visible
+    for (int i = 0; i < 2; ++i)
+        tabBtns[i].setToggleState(i == currentEnv, juce::dontSendNotification);
+    // Keep ENV3 and env1_depth hidden (depth lives in FilterSection)
+    auto sv3 = [](std::initializer_list<juce::Component*> cs)
+    { for (auto* c : cs) c->setVisible(false); };
+    sv3({&sAtk3,&sDcy3,&sSus3,&sHld3,&sRel3,&lAtk3,&lDcy3,&lSus3,&lHld3,&lRel3,&cCrv3,&lCrv3});
+    sDep1.setVisible(false); lDep1.setVisible(false);
     repaint();
 }
 
@@ -155,8 +159,8 @@ void EnvelopeSection::paint(juce::Graphics& g)
 {
     const int W = getWidth(), pad = 6;
 
-    // ADSR visualisation canvas (no fill — PNG shows through)
-    auto vizArea = juce::Rectangle<float>(pad, 38, W - 2*pad, 80);
+    // ADSR viz at top — aligned with Filter and LFO panels; narrowed 10px
+    auto vizArea = juce::Rectangle<float>(pad + 5, 17, W - 2*pad - 10, 98);
 
     // Grid
     g.setColour(GREEN.withAlpha(0.04f));
@@ -188,6 +192,12 @@ void EnvelopeSection::paint(juce::Graphics& g)
         }
         drawADSR(g, vizArea.reduced(4, 4), atk, hld, dcy, sus, rel, vizCol);
     }
+
+    // Row headers for always-visible knob rows
+    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.0f, juce::Font::bold));
+    g.setColour(GREEN.withAlpha(0.55f));
+    g.drawText("FILTER ENV", pad + 5, 138, 120, 9, juce::Justification::left);
+    g.drawText("AMP ENV",    pad + 5, 208, 120, 9, juce::Justification::left);
 }
 
 void EnvelopeSection::layoutEnv(int envIdx, juce::Rectangle<int> area)
@@ -195,7 +205,7 @@ void EnvelopeSection::layoutEnv(int envIdx, juce::Rectangle<int> area)
     const int pad = 6, W = area.getWidth(), x0 = area.getX(), y0 = area.getY();
     int numKnobs = (envIdx == 0) ? 6 : 5;
     int kw = (W - 2 * pad) / numKnobs;
-    const int Km = 28;
+    const int Km = 40;
 
     juce::Slider* knobs[] = { envIdx==0?&sAtk1:envIdx==1?&sAtk2:&sAtk3,
                                envIdx==0?&sDcy1:envIdx==1?&sDcy2:&sDcy3,
@@ -226,12 +236,55 @@ void EnvelopeSection::layoutEnv(int envIdx, juce::Rectangle<int> area)
 void EnvelopeSection::resized()
 {
     const int W = getWidth(), pad = 6;
-    // Two tabs — each takes half the width
-    int tw = (W - 3 * pad) / 2;
-    tabBtns[0].setBounds(pad,          16, tw, 14);
-    tabBtns[1].setBounds(pad + tw + pad, 16, tw, 14);
 
-    // Knobs below ADSR viz (viz occupies y=38-118)
-    auto area = getLocalBounds().withTrimmedTop(120).reduced(0, 2);
-    layoutEnv(currentEnv, area);
+    sectionTitle.setBounds(pad, 1, W - 2*pad, 11);
+
+    // Tabs below viz (Y=17-115) — only control which env is shown in the viz
+    int tw = (W - 3 * pad) / 2;
+    tabBtns[0].setBounds(pad,            118, tw, 14);
+    tabBtns[1].setBounds(pad + tw + pad, 118, tw, 14);
+
+    // ── FILTER ENV knobs (row 1, 5 knobs — DEPTH moved to Filter panel) ───
+    {
+        const int Km = 42, numK = 5, y = 150;
+        sDep1.setVisible(false); lDep1.setVisible(false);   // lives in FilterSection now
+        int kw = (W - 2*pad) / numK;
+        juce::Slider* ks[] = { &sAtk1,&sDcy1,&sSus1,&sHld1,&sRel1 };
+        juce::Label*  ls[] = { &lAtk1,&lDcy1,&lSus1,&lHld1,&lRel1 };
+        for (int i = 0; i < numK; ++i)
+        {
+            int x = pad + i*kw + (kw-Km)/2;
+            ks[i]->setBounds(x, y, Km, Km);
+            ls[i]->setBounds(pad + i*kw, y+Km+2, kw, 10);
+        }
+    }
+
+    // ── AMP ENV knobs (row 2) — always visible ────────────────────────────
+    {
+        const int Km = 42, numK = 5, y = 220;
+        int kw = (W - 2*pad) / numK;
+        juce::Slider* ks[] = { &sAtk2,&sDcy2,&sSus2,&sHld2,&sRel2 };
+        juce::Label*  ls[] = { &lAtk2,&lDcy2,&lSus2,&lHld2,&lRel2 };
+        for (int i = 0; i < numK; ++i)
+        {
+            int x = pad + i*kw + (kw-Km)/2;
+            ks[i]->setBounds(x, y, Km, Km);
+            ls[i]->setBounds(pad + i*kw, y+Km+2, kw, 10);
+        }
+    }
+
+    // ── Curve combos side by side at bottom — narrowed ───────────────────
+    const int crvY = 278, crvW = 110;
+    lCrv1.setText("F.CRV", juce::dontSendNotification);
+    lCrv2.setText("A.CRV", juce::dontSendNotification);
+    lCrv1.setBounds(pad,           crvY+2, 38, 10);
+    cCrv1.setBounds(pad+50,        crvY,   crvW, 16);
+    lCrv2.setBounds(W/2+pad,       crvY+2, 38, 10);
+    cCrv2.setBounds(W/2+pad+50,    crvY,   crvW, 16);
+
+    // Make all ENV1+ENV2 controls visible
+    auto svOn = [](std::initializer_list<juce::Component*> cs)
+    { for (auto* c : cs) c->setVisible(true); };
+    svOn({&sAtk1,&sDcy1,&sSus1,&sHld1,&sRel1,&sDep1,&lAtk1,&lDcy1,&lSus1,&lHld1,&lRel1,&lDep1,&cCrv1,&lCrv1});
+    svOn({&sAtk2,&sDcy2,&sSus2,&sHld2,&sRel2,&lAtk2,&lDcy2,&lSus2,&lHld2,&lRel2,&cCrv2,&lCrv2});
 }

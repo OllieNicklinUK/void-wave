@@ -306,6 +306,10 @@ void WavetableDisplay::paint(juce::Graphics& g)
     const int W = getWidth(), H = getHeight();
     const int pad = 8;
 
+    // Section title — top-left, FX-style
+    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
+    g.setColour(C1.withAlpha(0.75f));
+    g.drawText("WAVE SCANNER", pad, 0, 120, 11, juce::Justification::centredLeft);
 
     // Canvas
     auto canvas = juce::Rectangle<float>(
@@ -400,7 +404,11 @@ void WavetableDisplay::showTableMenu(bool isOsc1)
     for (int i = 0; i < N_TABLES; ++i)
         menu.addItem(i + 1, TABLE_NAMES[i]);
 
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
+    auto zone        = isOsc1 ? osc1NameZone : osc2NameZone;
+    auto screenArea  = localAreaToGlobal(zone.toFloat()).toNearestInt();
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetScreenArea(screenArea)
+                           .withMinimumWidth(120),
         [this, isOsc1](int result)
         {
             if (result <= 0) return;

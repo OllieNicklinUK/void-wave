@@ -57,6 +57,11 @@ private:
     juce::TextButton autoPlayBtn { "AUTO" };
     juce::Label      noteLabel;
 
+    // Master volume knob (top bar)
+    juce::Slider sMaster;
+    juce::Label  lMaster { "", "MASTER" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attMaster;
+
     void timerCallback() override;
     void updatePresetDisplay();
     void showBrowser();

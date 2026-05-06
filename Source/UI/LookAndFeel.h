@@ -15,7 +15,7 @@ namespace VW
 
     // ── Borders ───────────────────────────────────────────────────────────────
     inline constexpr uint32_t BORDER_SUB = 0xff1c2030;   // hairline
-    inline constexpr uint32_t BORDER_VIS = 0xff2a3050;   // visible border
+    inline constexpr uint32_t BORDER_VIS = 0xff2b2a2f;   // visible border
 
     // ── Neon palette ──────────────────────────────────────────────────────────
     inline constexpr uint32_t NEON_AMBER  = 0xfff5a623;  // primary brand

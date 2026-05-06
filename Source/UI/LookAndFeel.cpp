@@ -241,10 +241,11 @@ void VoidWaveLookAndFeel::drawButtonBackground(juce::Graphics& g,
 
     // Fill — respect transparent buttonColourId (lets PNG show through)
     juce::Colour base = button.findColour(juce::TextButton::buttonColourId);
+    bool noHover = button.getProperties().contains("noHover");
     juce::Colour fill = base;
-    if (down || on)       fill = accent.withAlpha(0.18f);
-    else if (highlighted) fill = base.isTransparent() ? juce::Colour(VW::BG_HIGH).withAlpha(0.5f)
-                                                        : juce::Colour(VW::BG_HIGH);
+    if (down || on)                  fill = accent.withAlpha(0.18f);
+    else if (highlighted && !noHover) fill = base.isTransparent() ? juce::Colour(VW::BG_HIGH).withAlpha(0.5f)
+                                                                   : juce::Colour(VW::BG_HIGH);
 
     if (fill.getAlpha() > 0)
     {
@@ -257,7 +258,7 @@ void VoidWaveLookAndFeel::drawButtonBackground(juce::Graphics& g,
     {
         juce::Colour border = (on || down)
             ? accent.withAlpha(0.8f)
-            : (highlighted ? juce::Colour(VW::BORDER_VIS) : juce::Colour(VW::BORDER_SUB));
+            : ((highlighted && !noHover) ? juce::Colour(VW::BORDER_VIS) : juce::Colour(VW::BORDER_SUB));
         g.setColour(border);
         g.drawRoundedRectangle(b, 3.0f, 1.0f);
     }

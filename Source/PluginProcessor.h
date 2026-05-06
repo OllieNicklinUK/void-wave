@@ -62,9 +62,11 @@ public:
         return -1;
     }
 
+    // ── Wavetable bank (public so UI can call importUserTable) ────────────
+    WavetableBank wavetableBank;
+
 private:
     // ── DSP ────────────────────────────────────────────────────────────────
-    WavetableBank wavetableBank;
     ModMatrix     modMatrix;
     VoiceManager  voiceManager;
     Distortion    fxDistortion;
@@ -122,6 +124,12 @@ private:
     std::atomic<float>* p_filter_drive     = nullptr;
     std::atomic<float>* p_filter_keytrack  = nullptr;
     std::atomic<float>* p_filter_veltrack  = nullptr;
+    std::atomic<float>* p_filter_route     = nullptr;
+    // Sub + Noise
+    std::atomic<float>* p_sub_level        = nullptr;
+    std::atomic<float>* p_sub_octave       = nullptr;
+    std::atomic<float>* p_noise_level      = nullptr;
+    std::atomic<float>* p_noise_color      = nullptr;
     // ENV 1
     std::atomic<float>* p_env1_attack      = nullptr;
     std::atomic<float>* p_env1_decay       = nullptr;

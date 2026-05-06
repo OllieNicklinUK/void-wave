@@ -25,6 +25,17 @@ void WavetableBank::loadBuiltInTables()
     addBassTable(0);      // Bass 01
     addBassTable(1);      // Bass 02
     addNoiseTable();
+
+    // Pre-allocate 4 user import slots (indices 9-12) with silence.
+    // Audio thread always reads from these stable heap addresses; importUserTable()
+    // fills them in-place so the pointer never changes.
+    for (int i = 0; i < 4; ++i)
+    {
+        TableEntry e;
+        e.name = "USR" + juce::String(i + 1);
+        e.data.assign(static_cast<size_t>(SAMPLES_PER_TABLE), 0.0f);
+        tables.push_back(std::move(e));
+    }
 }
 
 // ── SINE: pure sine → harmonic-rich additive (morphs toward saw spectrum) ────
@@ -289,7 +300,47 @@ const float* WavetableBank::getTableData(int index) const
     return nullptr;
 }
 
-bool WavetableBank::importUserTable(int /*userSlot*/, const juce::File& /*wavFile*/)
+bool WavetableBank::importUserTable(int userSlot, const juce::File& wavFile)
 {
-    return false;
+    int targetIdx = 9 + userSlot;
+    if (targetIdx < 0 || targetIdx >= static_cast<int>(tables.size()))
+        return false;
+
+    juce::AudioFormatManager mgr;
+    mgr.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(wavFile));
+    if (!reader || reader->lengthInSamples < 8)
+        return false;
+
+    int numSrc = static_cast<int>(juce::jmin((juce::int64)reader->lengthInSamples, (juce::int64)reader->sampleRate));
+    juce::AudioBuffer<float> src(1, numSrc);
+    reader->read(&src, 0, numSrc, 0, true, false);
+    const float* s = src.getReadPointer(0);
+
+    // Resample one cycle to FRAME_SIZE via linear interpolation
+    std::vector<float> oneFrame(static_cast<size_t>(FRAME_SIZE));
+    double ratio = static_cast<double>(numSrc) / FRAME_SIZE;
+    for (int i = 0; i < FRAME_SIZE; ++i)
+    {
+        double pos  = i * ratio;
+        int    lo   = static_cast<int>(pos) % numSrc;
+        int    hi   = (lo + 1) % numSrc;
+        float  frac = static_cast<float>(pos - std::floor(pos));
+        oneFrame[static_cast<size_t>(i)] = s[lo] + frac * (s[hi] - s[lo]);
+    }
+
+    // Normalise
+    float peak = 0.0f;
+    for (float v : oneFrame) peak = std::max(peak, std::abs(v));
+    if (peak > 0.001f) for (float& v : oneFrame) v /= peak;
+
+    // Tile into 256 identical frames (in-place — pointer stays valid)
+    auto& data = tables[static_cast<size_t>(targetIdx)].data;
+    for (int f = 0; f < NUM_FRAMES; ++f)
+        std::copy(oneFrame.begin(), oneFrame.end(),
+                  data.begin() + static_cast<ptrdiff_t>(f * FRAME_SIZE));
+
+    tables[static_cast<size_t>(targetIdx)].name =
+        wavFile.getFileNameWithoutExtension().substring(0, 6).toUpperCase();
+    return true;
 }

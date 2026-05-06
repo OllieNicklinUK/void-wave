@@ -16,6 +16,7 @@ void Filter::prepare(double sr, int /*blockSize*/)
 void Filter::reset()
 {
     stage1 = stage2 = {};
+    ladder = {};
     formantBP[0] = formantBP[1] = formantBP[2] = {};
     combWritePos = 0;
     std::fill(combBuffer.begin(), combBuffer.end(), 0.0f);
@@ -35,12 +36,20 @@ void Filter::setCutoff(float hz)
 
 void Filter::updateCoefficients()
 {
-    // Simper SVF 2012
-    g  = std::tan(juce::MathConstants<float>::pi * cutoff / static_cast<float>(sampleRate));
-    k  = 2.0f - 2.0f * resonance;
+    const float pi = juce::MathConstants<float>::pi;
+    g  = std::tan(pi * cutoff / static_cast<float>(sampleRate));
+
+    // SVF resonance: exponential curve spreads musical range across the knob
+    {
+        float r = juce::jlimit(0.0f, 0.9999f, resonance);
+        k = 2.0f * std::pow(1.0f - r, 1.5f);
+    }
     a1 = 1.0f / (1.0f + g * (g + k));
     a2 = g * a1;
     a3 = g * a2;
+
+    // Ladder: bilinear one-pole LP coefficient
+    g_lp = g / (1.0f + g);
 }
 
 float Filter::softClip(float x) const
@@ -70,6 +79,22 @@ float Filter::applySVF(float input, SVFState& s, bool returnLP) const
 
     if (returnLP) return v2;
     return input - k * v1 - v2;
+}
+
+float Filter::applyLadder(float input)
+{
+    float r = juce::jlimit(0.0f, 0.9999f, resonance);
+    float res_exp = 1.0f - std::pow(1.0f - r, 1.5f);
+    float res4 = 3.9f * res_exp;
+
+    float x = std::tanh((input - res4 * ladder.y[3]) * 0.9f);
+
+    ladder.y[0] += g_lp * (std::tanh(x)              - ladder.y[0]);
+    ladder.y[1] += g_lp * (std::tanh(ladder.y[0])    - ladder.y[1]);
+    ladder.y[2] += g_lp * (std::tanh(ladder.y[1])    - ladder.y[2]);
+    ladder.y[3] += g_lp * (std::tanh(ladder.y[2])    - ladder.y[3]);
+
+    return ladder.y[3] * (1.0f + res_exp * 0.5f);
 }
 
 float Filter::applyComb(float input)
@@ -144,10 +169,7 @@ float Filter::processSample(float input)
             return input - k * v1;
         }
         case FilterType::LP24:
-        {
-            float s1 = applySVF(input,  stage1, true);
-            return    applySVF(s1,     stage2, true);
-        }
+            return applyLadder(input);
         case FilterType::HP24:
         {
             float s1 = applySVF(input,  stage1, false);

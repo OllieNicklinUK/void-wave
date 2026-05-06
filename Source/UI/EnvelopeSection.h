@@ -46,6 +46,8 @@ private:
     // Raw param pointers for live ADSR visualisation
     std::atomic<float>* envPtrs[3][6] = {};  // [envIdx][atk,dcy,sus,hld,rel,dep]
 
+    juce::Label sectionTitle;
+
     static void drawADSR(juce::Graphics& g, juce::Rectangle<float> area,
                          float atk, float hld, float dcy, float sus, float rel,
                          juce::Colour col);

@@ -74,6 +74,8 @@ FilterSection::FilterSection(VoidWaveAudioProcessor& p) : processor(p)
     };
     sk(sCutoff, lCutoff); sk(sRes, lRes); sk(sDrive, lDrive);
     sk(sKeyTrack, lKey);  sk(sVelTrack, lVel);
+    sk(sEnvDepth, lEnvDepth);
+    sEnvDepth.setComponentID("env1_depth");
 
     // Cutoff: make it look bigger (large arc)
     sCutoff.setSkewFactorFromMidPoint(1000.0);
@@ -90,12 +92,32 @@ FilterSection::FilterSection(VoidWaveAudioProcessor& p) : processor(p)
     lType.setColour(juce::Label::textColourId, juce::Colour(VW::TEXT_MID));
     addAndMakeVisible(lType);
 
-    attCutoff = std::make_unique<SlAtt>(t, "filter_cutoff",   sCutoff);
-    attRes    = std::make_unique<SlAtt>(t, "filter_res",      sRes);
-    attDrive  = std::make_unique<SlAtt>(t, "filter_drive",    sDrive);
-    attKey    = std::make_unique<SlAtt>(t, "filter_keytrack", sKeyTrack);
-    attVel    = std::make_unique<SlAtt>(t, "filter_veltrack", sVelTrack);
-    attType   = std::make_unique<CbAtt>(t, "filter_type",     cType);
+    attCutoff   = std::make_unique<SlAtt>(t, "filter_cutoff",   sCutoff);
+    attRes      = std::make_unique<SlAtt>(t, "filter_res",      sRes);
+    attDrive    = std::make_unique<SlAtt>(t, "filter_drive",    sDrive);
+    attKey      = std::make_unique<SlAtt>(t, "filter_keytrack", sKeyTrack);
+    attVel      = std::make_unique<SlAtt>(t, "filter_veltrack", sVelTrack);
+    attType     = std::make_unique<CbAtt>(t, "filter_type",     cType);
+    attEnvDepth = std::make_unique<SlAtt>(t, "env1_depth",      sEnvDepth);
+
+    // OSC route buttons
+    static const char* routeLabels[] = { "1+2", "1", "2" };
+    pFilterRoute = t.getRawParameterValue("filter_route");
+    for (int i = 0; i < 3; ++i)
+    {
+        btnRoute[i].setButtonText(routeLabels[i]);
+        btnRoute[i].setClickingTogglesState(false);
+        btnRoute[i].onClick = [this, i] { setRoute(i); };
+        btnRoute[i].getProperties().set("noHover", true);
+        addAndMakeVisible(btnRoute[i]);
+    }
+    updateRouteButtons();
+
+    // Section title
+    sectionTitle.setText("FILTER", juce::dontSendNotification);
+    sectionTitle.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::bold));
+    sectionTitle.setColour(juce::Label::textColourId, AMBER);
+    addAndMakeVisible(sectionTitle);
 
     // ENV1 pointers for live ADSR viz
     pEnv1Atk = t.getRawParameterValue("env1_attack");
@@ -114,12 +136,36 @@ FilterSection::FilterSection(VoidWaveAudioProcessor& p) : processor(p)
     startTimerHz(30);
 }
 
+void FilterSection::setRoute(int route)
+{
+    if (auto* param = dynamic_cast<juce::AudioParameterInt*>(
+            processor.apvts.getParameter("filter_route")))
+        param->setValueNotifyingHost(param->getNormalisableRange().convertTo0to1(float(route)));
+    updateRouteButtons();
+}
+
+void FilterSection::updateRouteButtons()
+{
+    int cur = pFilterRoute ? static_cast<int>(pFilterRoute->load()) : 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        bool on = (i == cur);
+        btnRoute[i].setColour(juce::TextButton::buttonColourId,
+            on ? AMBER.withAlpha(0.85f) : juce::Colour(VW::BG_CONTROL));
+        btnRoute[i].setColour(juce::TextButton::textColourOnId,
+            on ? juce::Colour(VW::BG_RAISED) : AMBER);
+        btnRoute[i].setColour(juce::TextButton::textColourOffId,
+            on ? juce::Colour(VW::BG_RAISED) : AMBER.withAlpha(0.5f));
+        btnRoute[i].repaint();
+    }
+}
+
 void FilterSection::paint(juce::Graphics& g)
 {
     const int W = getWidth(), H = getHeight(), pad = 8;
 
     // ADSR visualisation canvas (no fill — PNG background shows through)
-    auto vizArea = juce::Rectangle<float>(pad, 17, W - 2*pad, 68);
+    auto vizArea = juce::Rectangle<float>(pad, 27, W - 2*pad, 68);
 
     // Grid
     g.setColour(AMBER.withAlpha(0.04f));
@@ -148,46 +194,47 @@ void FilterSection::resized()
 {
     const int W = getWidth(), pad = 8;
 
-    // TYPE combo — nudged down to clear the viz background
-    lType.setBounds(pad, 94, 30, 10);
-    cType.setBounds(pad + 32, 92, W - pad - 32 - pad, 17);
+    // Section title
+    sectionTitle.setBounds(pad, 1, W - 2*pad, 11);
 
-    // Available vertical space below combo: getHeight() - 104
-    // Primary knobs (CUTOFF 50% bigger, RES 30% bigger), secondary 30% bigger
-    // Spread to fill the section height
-    const int KC  = 63;   // CUTOFF: 42 * 1.5
-    const int KR  = 55;   // RES:    42 * 1.3
-    const int Km  = 36;   // DRIVE/KEY/VEL: 28 * 1.3
-    const int H   = getHeight();
-    const int avail = H - 106;                        // space below combo
+    // OSC route buttons — right side of TYPE row, same height as combo
+    const int btnH = 17, btnW = 26, btnGap = 2;
+    int btnGroupW = 3 * btnW + 2 * btnGap;
+    int btnX = W - pad - btnGroupW;
+    for (int i = 0; i < 3; ++i)
+        btnRoute[i].setBounds(btnX + i * (btnW + btnGap), 102, btnW, btnH);
 
-    // Three zones: primary row, gap, secondary row, gap
-    const int primaryH   = KC + 14;                   // knob + label
+    // TYPE combo — aligned with route buttons
+    lType.setBounds(pad, 104, 30, 10);
+    cType.setBounds(pad + 32, 102, btnX - pad - 32 - 6, 17);
+
+    // 3-column primary: CUTOFF (larger) | RES | ENV DEP
+    // 3-column secondary: DRIVE | KEY TRK | VEL TRK
+    const int KC = 56, KR = 46, Km = 36;
+    const int H  = getHeight();
+    const int kw = (W - 2*pad) / 3;   // equal thirds
+
+    const int primaryH   = KC + 14;
     const int secondaryH = Km + 14;
-    const int totalUsed  = primaryH + secondaryH + 24; // 24px gap between rows
+    const int avail      = H - 116;
+    const int totalUsed  = primaryH + secondaryH + 24;
     const int topPad     = (avail - totalUsed) / 2;
+    const int kY  = 114 + topPad;
+    const int kY2 = kY + primaryH + 24;
 
-    int kY = 104 + topPad;
-
-    int halfW  = (W - 3 * pad) / 2;
-    int leftX  = pad + (halfW - KC) / 2;
-    int rightX = pad + halfW + pad + (halfW - KR) / 2;
-    int centreY = kY + KC / 2;                         // vertical centre of primary row
-
-    sCutoff.setBounds(leftX,              kY,                   KC, KC);
-    lCutoff.setBounds(pad,                kY + KC + 3,          halfW, 10);
-    sRes   .setBounds(rightX,             centreY - KR / 2,     KR, KR);
-    lRes   .setBounds(pad + halfW + pad,  kY + KC + 3,          halfW, 10);
-
-    int kY2  = kY + primaryH + 24;
-    int kw3  = (W - 2 * pad) / 3;
-    auto plK3 = [&](juce::Slider& s, juce::Label& l, int col)
+    auto plK = [&](juce::Slider& s, juce::Label& l, int col, int size, int row)
     {
-        int x = pad + col * kw3 + (kw3 - Km) / 2;
-        s.setBounds(x, kY2,          Km, Km);
-        l.setBounds(pad + col * kw3, kY2 + Km + 3, kw3, 10);
+        int x   = pad + col*kw + (kw - size) / 2;
+        int vc  = (row == 0) ? kY + KC/2 : kY2;
+        int top = vc - size/2;
+        s.setBounds(x, top, size, size);
+        l.setBounds(pad + col*kw, top + size + 3, kw, 10);  // 3px below knob bottom for both rows
     };
-    plK3(sDrive,    lDrive,   0);
-    plK3(sKeyTrack, lKey,     1);
-    plK3(sVelTrack, lVel,     2);
+
+    plK(sCutoff,   lCutoff,   0, KC, 0);
+    plK(sRes,      lRes,      1, KR, 0);
+    plK(sEnvDepth, lEnvDepth, 2, KR, 0);
+    plK(sDrive,    lDrive,    0, Km, 1);
+    plK(sKeyTrack, lKey,      1, Km, 1);
+    plK(sVelTrack, lVel,      2, Km, 1);
 }

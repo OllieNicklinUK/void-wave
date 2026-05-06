@@ -10,7 +10,7 @@ public:
     void resized() override;
 private:
     VoidWaveAudioProcessor& processor;
-    int currentLFO = 0;
+    int currentLFO = 0;   // controls which LFO is shown in viz
     juce::TextButton tabBtns[2];
 
     juce::Slider  sRate1,sDepth1,sPhase1,sFade1,sSyncDiv1;
@@ -39,8 +39,10 @@ private:
     std::atomic<float>* pRate1  = nullptr;
     std::atomic<float>* pRate2  = nullptr;
 
+    juce::Label sectionTitle;
+
     void timerCallback() override { lfoAnimPhase += 0.04f; repaint(); }
-    static float lfoSample(int shape, float phase);  // 0-1 phase → -1..1
+    static float lfoSample(int shape, float phase);
     void drawLFOPreview(juce::Graphics& g, juce::Rectangle<int> area) const;
 
     void showLFO(int idx);

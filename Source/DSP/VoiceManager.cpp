@@ -28,9 +28,15 @@ void Voice::reset()
     filterL.reset(); filterR.reset();
     env1.reset();  env2.reset();  env3.reset();  pitchEnv.reset();
     lfo1.reset();  lfo2.reset();
-    active    = false;
-    releasing = false;
-    midiNote  = -1;
+    subPhase      = 0.0f;
+    noiseLP       = 0.0f;
+    antiClickGain = 0.0f;
+    stealFade     = 1.0f;
+    hasPending    = false;
+    pendingNote   = -1;
+    active        = false;
+    releasing     = false;
+    midiNote      = -1;
 }
 
 // ── VoiceManager ─────────────────────────────────────────────────────────────
@@ -39,8 +45,10 @@ VoiceManager::VoiceManager() = default;
 
 void VoiceManager::prepare(double sr, int bs)
 {
-    sampleRate = sr;
-    blockSize  = bs;
+    sampleRate     = sr;
+    blockSize      = bs;
+    antiClickRate  = 1.0f / (0.005f * static_cast<float>(sr));  // 0→1 in 5 ms
+    stealFadeRate  = 1.0f / (0.003f * static_cast<float>(sr));  // 1→0 in 3 ms
     for (auto& v : voices) v.prepare(sr, bs);
 }
 
@@ -149,55 +157,70 @@ Voice* VoiceManager::stealVoice()
     return target;
 }
 
+void VoiceManager::activateVoice(Voice& v, int note, float vel, bool shouldGlide)
+{
+    v.midiNote      = note;
+    v.velocity      = vel;
+    v.active        = true;
+    v.releasing     = false;
+    v.age           = 0;
+    v.antiClickGain = 0.0f;   // ramps 0→1 over 5ms (fix #2: filter sees ramping signal)
+    v.stealFade     = 1.0f;
+    v.hasPending    = false;
+
+    applyParamsToVoice(v, lastParams);
+
+    float baseHz = midiNoteToHz(note, pitchBend, lastParams.masterTune);
+
+    if (!shouldGlide)
+        v.glide.setCurrentAndTargetValue(baseHz);
+    else
+        v.glide.setTargetValue(baseHz);
+
+    v.osc1.setFrequency(oscHz(baseHz, lastParams.osc1Coarse, lastParams.osc1Fine));
+    v.osc2.setFrequency(oscHz(baseHz, lastParams.osc2Coarse, lastParams.osc2Fine));
+    v.osc1.triggerNote();
+    v.osc2.triggerNote();
+    v.env1.noteOn(vel);
+    v.env2.noteOn(vel);
+    v.env3.noteOn(vel);
+    v.pitchEnv.setAttack(lastParams.pitchEnvAttack);
+    v.pitchEnv.setDecay(0.05f); v.pitchEnv.setSustain(0.0f); v.pitchEnv.setRelease(0.01f);
+    v.pitchEnv.noteOn(vel);
+    v.lfo1.noteOn();
+    v.lfo2.noteOn();
+    v.filterL.reset();
+    v.filterR.reset();
+    v.pitchDrift    = 0.0f;
+    v.pitchDriftVel = 0.0f;
+    v.wtDriftPos    = 0.0f;
+    v.wtDriftVel    = 0.0f;
+}
+
 void VoiceManager::noteOn(int note, float vel)
 {
-    // LEGATO_ONLY glide: only glide if a voice is already playing the same or recent note
     bool anyActive = false;
     for (int i = 0; i < maxVoices; ++i)
         if (voices[i].active && !voices[i].releasing) { anyActive = true; break; }
 
-    Voice* v = findFreeVoice();
-    if (!v) v = stealVoice();
-    if (!v) return;
-
-    v->midiNote  = note;
-    v->velocity  = vel;
-    v->active    = true;
-    v->releasing = false;
-    v->age       = 0;
-
-    applyParamsToVoice(*v, lastParams);
-
-    float baseHz = midiNoteToHz(note, pitchBend, lastParams.masterTune);
-
-    // Glide: LEGATO_ONLY only slides from previous note; ALWAYS always slides
     bool shouldGlide = (glideMode == GlideMode::ALWAYS) ||
                        (glideMode == GlideMode::LEGATO_ONLY && anyActive);
-    if (!shouldGlide)
-        v->glide.setCurrentAndTargetValue(baseHz);
-    else
-        v->glide.setTargetValue(baseHz);
 
-    v->osc1.setFrequency(oscHz(baseHz, lastParams.osc1Coarse, lastParams.osc1Fine));
-    v->osc2.setFrequency(oscHz(baseHz, lastParams.osc2Coarse, lastParams.osc2Fine));
-    v->osc1.triggerNote();
-    v->osc2.triggerNote();
-    v->env1.noteOn(vel);
-    v->env2.noteOn(vel);
-    v->env3.noteOn(vel);
-    v->pitchEnv.setAttack(lastParams.pitchEnvAttack);
-    v->pitchEnv.setDecay(0.05f); v->pitchEnv.setSustain(0.0f); v->pitchEnv.setRelease(0.01f);
-    v->pitchEnv.noteOn(vel);
-    v->lfo1.noteOn();
-    v->lfo2.noteOn();
-    v->filterL.reset();
-    v->filterR.reset();
-    // Reset drift state so each note starts with the same character
-    // (drift then develops organically from silence)
-    v->pitchDrift    = 0.0f;
-    v->pitchDriftVel = 0.0f;
-    v->wtDriftPos    = 0.0f;
-    v->wtDriftVel    = 0.0f;
+    Voice* v = findFreeVoice();
+    if (!v)
+    {
+        // No free voice — queue a steal with a 3ms fade-out before the new note fires
+        v = stealVoice();
+        if (!v) return;
+        v->hasPending   = true;
+        v->pendingNote  = note;
+        v->pendingVel   = vel;
+        v->pendingGlide = shouldGlide;
+        // stealFade will be decremented in the render loop; activateVoice fires when it hits 0
+        return;
+    }
+
+    activateVoice(*v, note, vel, shouldGlide);
 }
 
 void VoiceManager::noteOff(int note)
@@ -346,29 +369,48 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
         v.filterR.setDrive(baseDrive);
 
         // ── Render oscillators ────────────────────────────────────────────
+        const int filterRoute = lastParams.filterRoute;
         v.osc1.process(v.tmpL.data(), v.tmpR.data(), n);
 
         float oscMix = juce::jlimit(0.f, 1.f, lastParams.oscMix);
-        if (oscMix > 0.001f)
+        if (oscMix > 0.001f || filterRoute == 2)
         {
             v.osc2.process(v.tmpL2.data(), v.tmpR2.data(), n);
-            switch (lastParams.oscMixMode)
+
+            if (filterRoute == 0)
             {
-                case 1: // Ring
-                    for (int s = 0; s < n; ++s)
-                    {
-                        v.tmpL[s] = v.tmpL[s] * v.tmpL2[s];
-                        v.tmpR[s] = v.tmpR[s] * v.tmpR2[s];
-                    }
-                    break;
-                default: // Blend (0), Sync/FM fall back to blend until implemented
-                    for (int s = 0; s < n; ++s)
-                    {
-                        v.tmpL[s] = v.tmpL[s] * (1.f - oscMix) + v.tmpL2[s] * oscMix;
-                        v.tmpR[s] = v.tmpR[s] * (1.f - oscMix) + v.tmpR2[s] * oscMix;
-                    }
-                    break;
+                // Both: mix first, filter the combined signal
+                switch (lastParams.oscMixMode)
+                {
+                    case 1: // Ring
+                        for (int s = 0; s < n; ++s)
+                        {
+                            v.tmpL[s] = v.tmpL[s] * v.tmpL2[s];
+                            v.tmpR[s] = v.tmpR[s] * v.tmpR2[s];
+                        }
+                        break;
+                    default: // Blend (0), Sync/FM fall back to blend until implemented
+                        for (int s = 0; s < n; ++s)
+                        {
+                            v.tmpL[s] = v.tmpL[s] * (1.f - oscMix) + v.tmpL2[s] * oscMix;
+                            v.tmpR[s] = v.tmpR[s] * (1.f - oscMix) + v.tmpR2[s] * oscMix;
+                        }
+                        break;
+                }
             }
+            else if (filterRoute == 2)
+            {
+                // OSC2 only: swap so tmpL/R = osc2 (to filter), tmpL2/R2 = osc1 (dry add-back)
+                std::swap(v.tmpL, v.tmpL2);
+                std::swap(v.tmpR, v.tmpR2);
+            }
+            // filterRoute == 1: osc1 in tmpL/R (filtered), osc2 in tmpL2/R2 (dry add-back)
+        }
+        else if (filterRoute != 0)
+        {
+            // Route is 1 or 2 but osc2 was not rendered — zero tmpL2 for safe add-back
+            std::fill(v.tmpL2.begin(), v.tmpL2.begin() + n, 0.f);
+            std::fill(v.tmpR2.begin(), v.tmpR2.begin() + n, 0.f);
         }
 
         // ── Per-sample: ENV1+LFO2 → filter, ENV2 → VCA ───────────────────
@@ -383,29 +425,63 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
             src[int(ModSource::ENV1)] = env1Val;
             src[int(ModSource::ENV2)] = env2Val;
 
-            // Filter cutoff = base + ENV1 + LFO2 + filter FM (input level → cutoff)
-            // Filter FM: the input signal's instantaneous amplitude modulates cutoff
-            // at audio rate — gives the "breathing, alive" quality of analogue filters.
-            float inputLevel = (std::abs(v.tmpL[s]) + std::abs(v.tmpR[s])) * 0.5f;
-            float filterFM   = inputLevel * 55.0f;   // ~55Hz per unit amplitude
-
-            // Fixed 6000Hz scale: env1 sweeps the full audible range at any base cutoff.
             float cutoff = baseCutoff
-                + env1Val * lastParams.env1Depth * 6000.f
-                + lfo2Val * 4000.f
-                + filterFM;
+                + env1Val * lastParams.env1Depth * (baseCutoff - 20.f)
+                + lfo2Val * 4000.f;
             cutoff = juce::jlimit(20.f, 20000.f, cutoff);
 
             v.filterL.setCutoff(cutoff);
             v.filterR.setCutoff(cutoff);
 
+            // ── Fix #2: anti-click ramp — oscillator fades in before hitting filter ──
+            // Prevents filter resonance burst when a new voice starts mid-attack.
+            if (v.antiClickGain < 1.0f)
+                v.antiClickGain = juce::jmin(1.0f, v.antiClickGain + antiClickRate);
+            v.tmpL[s] *= v.antiClickGain;
+            v.tmpR[s] *= v.antiClickGain;
+
+            // ── Sub oscillator ────────────────────────────────────────────
+            if (lastParams.subLevel > 0.0f)
+            {
+                float subHz  = baseHz * (lastParams.subOctave == 0 ? 0.5f : 0.25f);
+                v.subPhase  += static_cast<float>(subHz / sampleRate);
+                if (v.subPhase >= 1.0f) v.subPhase -= 1.0f;
+                float sub = std::sin(v.subPhase * juce::MathConstants<float>::twoPi)
+                            * lastParams.subLevel * v.antiClickGain;
+                v.tmpL[s] += sub;
+                v.tmpR[s] += sub;
+            }
+
+            // ── Noise source ──────────────────────────────────────────────
+            if (lastParams.noiseLevel > 0.0f)
+            {
+                float raw   = v.rng.nextFloat() * 2.0f - 1.0f;
+                float fc    = 200.0f * std::pow(100.0f, lastParams.noiseColor);
+                float alpha = 1.0f - std::exp(-juce::MathConstants<float>::twoPi
+                                              * static_cast<float>(fc / sampleRate));
+                v.noiseLP  += alpha * (raw - v.noiseLP);
+                float noise = v.noiseLP * lastParams.noiseLevel * v.antiClickGain;
+                v.tmpL[s] += noise;
+                v.tmpR[s] += noise;
+            }
+
             v.tmpL[s] = v.filterL.processSample(v.tmpL[s]);
             v.tmpR[s] = v.filterR.processSample(v.tmpR[s]);
 
-            // ── Voice-level soft clipper — activates above 70% amplitude ─────
-            // When multiple voices sum and peak together, creates intermodulation
-            // that sounds like analogue crosstalk in a hardware poly synth.
-            float gain = env2Val * ampMod;
+            // Add dry osc back when routing to one osc only
+            if (filterRoute != 0)
+            {
+                v.tmpL[s] += v.tmpL2[s];
+                v.tmpR[s] += v.tmpR2[s];
+            }
+
+            // ── Fix #1: steal fade — ramps 1→0 while new note is pending ─────────
+            // Smoothly silences the stolen voice before firing the replacement.
+            if (v.hasPending && v.stealFade > 0.0f)
+                v.stealFade = juce::jmax(0.0f, v.stealFade - stealFadeRate);
+
+            // ── Voice-level soft clipper ──────────────────────────────────────────
+            float gain = env2Val * ampMod * v.stealFade;
             auto voiceClip = [](float x) -> float {
                 const float thr = 0.72f;
                 float ax = std::abs(x);
@@ -418,6 +494,16 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
             bufR[s] += voiceClip(v.tmpR[s] * gain);
         }
 
-        if (!v.env2.isActive()) v.reset();
+        // Only auto-reset when there's no steal pending (the fade is still running)
+        if (!v.env2.isActive() && !v.hasPending) v.reset();
+
+        // Fire the pending note once the steal fade has completed
+        if (v.hasPending && v.stealFade <= 0.001f)
+        {
+            bool anyActive = false;
+            for (int j = 0; j < maxVoices; ++j)
+                if (voices[j].active && !voices[j].releasing) { anyActive = true; break; }
+            activateVoice(v, v.pendingNote, v.pendingVel, v.pendingGlide);
+        }
     }
 }

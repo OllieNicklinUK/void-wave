@@ -25,6 +25,14 @@ private:
     juce::TextButton scanBtn { "SCAN" };
     std::atomic<float>* pWTMode = nullptr;
 
+    // WAV import
+    juce::TextButton loadWavBtn { "LOAD WAV" };
+    std::shared_ptr<juce::FileChooser> fileChooser;
+    void triggerWavLoad();
+
+    // Section title
+    juce::Label titleLabel;
+
     juce::Slider  sPos, sCoarse, sFine, sLevel, sPan, sDetune;
     juce::Slider  sWidth, sPitchAtk, sPitchAmt;
     juce::Slider  sTable;   // hidden, APVTS-bound
