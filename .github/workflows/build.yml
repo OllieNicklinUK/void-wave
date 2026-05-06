@@ -22,28 +22,13 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --target VoidWave_VST3
 
-      # Upload the VST3 first — independent of the installer step
       - name: Upload raw VST3
         uses: actions/upload-artifact@v4
         with:
           name: VoidWave-Windows-VST3
-          path: "C:/Program Files/Common Files/VST3/Void Wave.vst3"
-          retention-days: 30
-
-      - name: Run NSIS
-        if: hashFiles('installer/VoidWave.nsi') != ''
-        run: |
-          choco install nsis -y
-          & "C:\Program Files (x86)\NSIS\makensis.exe" /V4 installer\VoidWave.nsi
-
-      - name: Upload installer
-        if: hashFiles('installer/VoidWave-Setup.exe') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: VoidWave-Windows-Setup
-          path: installer/VoidWave-Setup.exe
+          path: "build/VoidWave_artefacts/Release/VST3/Void Wave.vst3"
           retention-days: 30
 
   # ── macOS: VST3 + AU + .pkg installer ─────────────────────────────────────
