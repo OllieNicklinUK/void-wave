@@ -33,12 +33,13 @@ jobs:
           retention-days: 30
 
       - name: Run NSIS
+        if: hashFiles('installer/VoidWave.nsi') != ''
         run: |
           choco install nsis -y
           & "C:\Program Files (x86)\NSIS\makensis.exe" /V4 installer\VoidWave.nsi
 
       - name: Upload installer
-        if: success()
+        if: hashFiles('installer/VoidWave-Setup.exe') != ''
         uses: actions/upload-artifact@v4
         with:
           name: VoidWave-Windows-Setup
