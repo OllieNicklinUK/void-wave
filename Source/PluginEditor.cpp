@@ -95,6 +95,7 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
                 for (const auto& chosen : results)
                 {
                     if (!chosen.exists()) continue;
+                    
                     if (chosen.isDirectory())
                     {
                         added += audioProcessor.presetManager.importFromFolder(chosen);
@@ -102,8 +103,15 @@ VoidWaveAudioProcessorEditor::VoidWaveAudioProcessorEditor(VoidWaveAudioProcesso
                     }
                     else if (chosen.hasFileExtension(".vwpreset"))
                     {
-                        added += audioProcessor.presetManager.importFromFolder(chosen.getParentDirectory());
-                        foldersImported.addIfNotAlreadyThere(chosen.getParentDirectory().getFullPathName());
+                        juce::File userFolder = PresetManager::getUserPresetFolder().getChildFile("USER");
+                        userFolder.createDirectory();
+                        juce::File destFile = userFolder.getChildFile(chosen.getFileName());
+                        if (destFile.existsAsFile()) destFile.deleteFile();
+                        if (chosen.copyFileTo(destFile))
+                        {
+                            added++;
+                            foldersImported.addIfNotAlreadyThere("USER");
+                        }
                     }
                 }
                 presetBrowser.refresh();
@@ -241,7 +249,8 @@ void VoidWaveAudioProcessorEditor::onSavePreset()
     // Show a name-entry dialog, then save current APVTS state as a .vwpreset
     auto dialog = std::make_shared<juce::AlertWindow>("Save Preset", "Enter a name for this preset:", juce::MessageBoxIconType::NoIcon);
     dialog->addTextEditor("name", "", "Preset name");
-    dialog->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
+    dialog->addButton("Save to USER", 1, juce::KeyPress(juce::KeyPress::returnKey));
+    dialog->addButton("Save to Disk", 2);
     dialog->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
 
     // Suggest current preset name as default
@@ -256,31 +265,39 @@ void VoidWaveAudioProcessorEditor::onSavePreset()
             juce::String name = dialog->getTextEditorContents("name").trim();
             if (name.isEmpty()) return;
 
-            // Ask which category to save into
-            auto& pm2 = audioProcessor.presetManager;
-            juce::StringArray cats;
-            for (int i = 0; i < pm2.getNumPresets(); ++i)
+            if (result == 1) // Save to USER
             {
-                const auto& cat = pm2.getPreset(i).category;
-                if (!cats.contains(cat)) cats.add(cat);
-            }
-            if (cats.isEmpty()) cats.add("USER");
-
-            juce::AlertWindow::showOkCancelBox(
-                juce::MessageBoxIconType::NoIcon, "Category",
-                "Save '" + name + "' to which category?\n\n" + cats.joinIntoString(" / "),
-                "USER", "Cancel", nullptr,
-                juce::ModalCallbackFunction::create([this, name, cats](int ok)
+                if (audioProcessor.presetManager.savePreset(name, "USER"))
                 {
-                    juce::String cat = ok ? "USER" : "";
-                    if (cat.isEmpty()) return;
+                    presetBrowser.refresh();
+                    updatePresetDisplay();
+                }
+            }
+            else if (result == 2) // Save to Disk
+            {
+                fileChooser = std::make_unique<juce::FileChooser>(
+                    "Save Preset to Disk",
+                    juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                        .getChildFile(name.replace(" ", "_") + ".vwpreset"),
+                    "*.vwpreset", true);
 
-                    if (audioProcessor.presetManager.savePreset(name, cat))
+                fileChooser->launchAsync(
+                    juce::FileBrowserComponent::saveMode |
+                    juce::FileBrowserComponent::canSelectFiles,
+                    [this, name](const juce::FileChooser& fc)
                     {
-                        presetBrowser.refresh();
-                        updatePresetDisplay();
-                    }
-                }));
+                        juce::File file = fc.getResult();
+                        if (file != juce::File())
+                        {
+                            if (audioProcessor.presetManager.savePresetToDisk(name, file))
+                            {
+                                juce::AlertWindow::showMessageBoxAsync(
+                                    juce::AlertWindow::InfoIcon, "Saved",
+                                    "Preset saved to:\n" + file.getFullPathName());
+                            }
+                        }
+                    });
+            }
         }));
 }
 

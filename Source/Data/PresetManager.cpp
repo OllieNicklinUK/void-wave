@@ -252,6 +252,30 @@ bool PresetManager::savePreset(const juce::String& name, const juce::String& cat
     return root.writeTo(file);
 }
 
+bool PresetManager::savePresetToDisk(const juce::String& name, const juce::File& file)
+{
+    juce::XmlElement root("Parameters");
+    root.setAttribute("_name",     name);
+    root.setAttribute("_category", "USER");
+    root.setAttribute("_sub",      "USER");
+
+    for (auto* param : apvts.processor.getParameters())
+    {
+        if (auto* p = dynamic_cast<juce::RangedAudioParameter*>(param))
+        {
+            float actual = p->convertFrom0to1(p->getValue());
+            if (dynamic_cast<juce::AudioParameterInt*>(param) ||
+                dynamic_cast<juce::AudioParameterChoice*>(param) ||
+                dynamic_cast<juce::AudioParameterBool*>(param))
+                root.setAttribute(p->paramID, (int) std::round(actual));
+            else
+                root.setAttribute(p->paramID, (double) actual);
+        }
+    }
+
+    return root.writeTo(file);
+}
+
 void PresetManager::nextPreset()
 {
     if (presets.empty()) return;

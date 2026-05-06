@@ -25,6 +25,7 @@ public:
 
     bool loadPreset(int index);
     bool savePreset(const juce::String& name, const juce::String& category);
+    bool savePresetToDisk(const juce::String& name, const juce::File& file);
 
     void nextPreset();
     void previousPreset();

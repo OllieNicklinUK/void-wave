@@ -44,7 +44,7 @@ public:
     PresetManager                      presetManager { apvts };
 
     // Dev auto-play
-    bool autoPlayEnabled = true;
+    bool autoPlayEnabled = false;
     int  autoPlayCurNote = -1;
     void allNotesOff() { voiceManager.allNotesOff(); }
 
