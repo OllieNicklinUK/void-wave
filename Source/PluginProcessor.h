@@ -167,6 +167,7 @@ private:
     std::atomic<float>* p_lfo1_trigger     = nullptr;
     std::atomic<float>* p_lfo1_fade        = nullptr;
     std::atomic<float>* p_lfo1_depth       = nullptr;
+    std::atomic<float>* p_lfo1_target      = nullptr;
     // LFO 2
     std::atomic<float>* p_lfo2_shape       = nullptr;
     std::atomic<float>* p_lfo2_rate        = nullptr;
@@ -176,6 +177,7 @@ private:
     std::atomic<float>* p_lfo2_trigger     = nullptr;
     std::atomic<float>* p_lfo2_fade        = nullptr;
     std::atomic<float>* p_lfo2_depth       = nullptr;
+    std::atomic<float>* p_lfo2_target      = nullptr;
     // Mod matrix (12 × 4)
     std::atomic<float>* p_mod_source  [12] = {};
     std::atomic<float>* p_mod_dest    [12] = {};

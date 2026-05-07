@@ -103,6 +103,7 @@ struct SynthParamSnapshot
     int      lfo1Trigger  = 0;
     float    lfo1Fade     = 0.0f;
     float    lfo1Depth    = 0.5f;
+    int      lfo1Target   = 0;
 
     // ── LFO 2 (→ filter cutoff by default) ─────
     LFOShape lfo2Shape    = LFOShape::SINE;
@@ -113,6 +114,7 @@ struct SynthParamSnapshot
     int      lfo2Trigger  = 0;
     float    lfo2Fade     = 0.0f;
     float    lfo2Depth    = 0.5f;
+    int      lfo2Target   = 0;
 
     // ── Macros ─────────────────────────────────
     float macro[4] = { 0.0f, 0.0f, 0.0f, 0.0f };

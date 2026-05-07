@@ -221,6 +221,38 @@ bool PresetManager::loadPreset(int index)
     return true;
 }
 
+void PresetManager::loadInitPreset()
+{
+    // 1. Reset all params to 0
+    for (auto* param : apvts.processor.getParameters()) {
+        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param)) {
+            setParam(p->paramID, 0.0f);
+        }
+    }
+    
+    // 2. Set explicitly required params
+    setParam("master_volume", 0.50f);
+    setParam("osc1_level", 0.50f);
+    setParam("filter_cutoff", 20000.0f); // Open filter
+    setParam("osc1_shape", 2.0f); // Saw wave so we actually hear something
+    setParam("osc2_shape", 2.0f); // Saw wave
+    setParam("env_amp_sus", 1.0f); // Sustain so the note plays
+    setParam("env_amp_dec", 1.0f); // Decay at 1
+    
+    // 3. Save as "Init" in USER
+    savePreset("Init", "USER");
+    
+    // 4. Refresh and load the new preset
+    refresh();
+    
+    for (int i = 0; i < getNumPresets(); ++i) {
+        if (presets[i].name == "Init" && presets[i].category == "USER") {
+            loadPreset(i);
+            break;
+        }
+    }
+}
+
 bool PresetManager::savePreset(const juce::String& name, const juce::String& category)
 {
     juce::File folder = getUserPresetFolder().getChildFile(category.toUpperCase());

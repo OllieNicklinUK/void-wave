@@ -46,7 +46,11 @@ void LFO::updatePhaseInc()
     if (tempoSync)
     {
         double beatsPerSec = hostBPM / 60.0;
-        rateHz = static_cast<float>(beatsPerSec / syncDiv);
+        // syncDiv is choice index: 0="1/1", 1="1/2", 2="1/4", 3="1/8", 4="1/16", 5="1/32"
+        float divMap[6] = { 4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f };
+        int idx = juce::jlimit(0, 5, static_cast<int>(syncDiv));
+        float beatsPerCycle = divMap[idx];
+        rateHz = static_cast<float>(beatsPerSec / beatsPerCycle);
     }
     phaseInc = rateHz / static_cast<float>(sampleRate);
 }

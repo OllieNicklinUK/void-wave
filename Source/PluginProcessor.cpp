@@ -151,6 +151,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout VoidWaveAudioProcessor::crea
             juce::NormalisableRange<float>(0.0f, 10.0f, 0.0f, 0.3f), 0.0f));
         params.push_back(std::make_unique<juce::AudioParameterFloat>(
             px + "_depth",      nm + " Depth",       -1.0f, 1.0f, 0.0f));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            px + "_target",     nm + " Target",
+            juce::StringArray{"None","WT Position","Blend (Osc Mix)","Filter Cutoff","Other LFO Rate","Filter Env Amount","Amp Env Attack"}, 0));
     };
 
     makeLfoParams("lfo1", "LFO 1");
@@ -322,6 +325,7 @@ void VoidWaveAudioProcessor::cacheParamPointers()
     p_lfo1_trigger    = t->getRawParameterValue("lfo1_trigger");
     p_lfo1_fade       = t->getRawParameterValue("lfo1_fade");
     p_lfo1_depth      = t->getRawParameterValue("lfo1_depth");
+    p_lfo1_target     = t->getRawParameterValue("lfo1_target");
 
     p_lfo2_shape      = t->getRawParameterValue("lfo2_shape");
     p_lfo2_rate       = t->getRawParameterValue("lfo2_rate");
@@ -331,6 +335,7 @@ void VoidWaveAudioProcessor::cacheParamPointers()
     p_lfo2_trigger    = t->getRawParameterValue("lfo2_trigger");
     p_lfo2_fade       = t->getRawParameterValue("lfo2_fade");
     p_lfo2_depth      = t->getRawParameterValue("lfo2_depth");
+    p_lfo2_target     = t->getRawParameterValue("lfo2_target");
 
     for (int i = 0; i < 12; ++i)
     {
@@ -465,6 +470,7 @@ SynthParamSnapshot VoidWaveAudioProcessor::buildSnapshot() const
     p.lfo1Trigger   = static_cast<int>(p_lfo1_trigger->load());
     p.lfo1Fade      = p_lfo1_fade->load();
     p.lfo1Depth     = p_lfo1_depth->load();
+    p.lfo1Target    = p_lfo1_target ? static_cast<int>(p_lfo1_target->load()) : 0;
 
     p.lfo2Shape     = static_cast<LFOShape>(static_cast<int>(p_lfo2_shape->load()));
     p.lfo2Rate      = p_lfo2_rate->load();
@@ -474,6 +480,7 @@ SynthParamSnapshot VoidWaveAudioProcessor::buildSnapshot() const
     p.lfo2Trigger   = static_cast<int>(p_lfo2_trigger->load());
     p.lfo2Fade      = p_lfo2_fade->load();
     p.lfo2Depth     = p_lfo2_depth->load();
+    p.lfo2Target    = p_lfo2_target ? static_cast<int>(p_lfo2_target->load()) : 0;
 
     for (int i = 0; i < 4; ++i)
         p.macro[i] = p_macro[i]->load();

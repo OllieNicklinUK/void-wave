@@ -33,7 +33,15 @@ void Delay::setTimeMs(float ms)
 void Delay::setTempoSync(bool /*enabled*/, double bpm, float division)
 {
     double beatsPerSec = bpm / 60.0;
-    float periodMs     = static_cast<float>(division / beatsPerSec) * 1000.0f;
+    
+    // division comes in as 0..2000 from the Time knob.
+    // We map it to 6 discrete steps: 1/32, 1/16, 1/8, 1/4D, 1/4, 1/2
+    float norm = juce::jlimit(0.0f, 1.0f, division / 2000.0f);
+    int step = static_cast<int>(norm * 5.99f);
+    float syncDivs[6] = { 0.125f, 0.25f, 0.5f, 0.75f, 1.0f, 2.0f }; // fraction of a beat
+    float actualDiv = syncDivs[step];
+
+    float periodMs = static_cast<float>(actualDiv / beatsPerSec) * 1000.0f;
     setTimeMs(periodMs);
 }
 

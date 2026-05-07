@@ -334,11 +334,12 @@ void VoidWaveAudioProcessorEditor::resized()
     sMaster.setBounds(250, 10, 36, 36);
     lMaster.setBounds(290, 23, 50, 10);  // right of knob, vertically centred
 
-    importBtn    .setBounds(W - 316, 16, 56,  24);  // next to SAVE
-    saveBtn      .setBounds(W - 256, 16, 56,  24);
-    midiMapBtn   .setBounds(W - 192, 16, 62,  24);
-    autoPlayBtn  .setBounds(W - 126, 16, 56,  24);
-    noteLabel    .setBounds(W - 66,  12, 58,  28);
+    modMatrixBtn .setBounds(W - 358, 16, 62,  24);
+    importBtn    .setBounds(W - 292, 16, 56,  24);
+    saveBtn      .setBounds(W - 232, 16, 56,  24);
+    midiMapBtn   .setBounds(W - 172, 16, 62,  24);
+    autoPlayBtn  .setBounds(W - 106, 16, 56,  24);
+    noteLabel    .setBounds(W - 46,  12, 40,  28);
 
     midiLearnOverlay.setBounds(getLocalBounds());
     presetBrowser   .setBounds(getLocalBounds());

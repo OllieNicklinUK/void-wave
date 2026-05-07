@@ -2,57 +2,87 @@
 #include "LookAndFeel.h"
 static const juce::Colour AMBER { VW::SEC_FILTER };
 
-// ── Shared ADSR drawing ───────────────────────────────────────────────────────
+// ── Frequency response drawing ────────────────────────────────────────────────
 
-void FilterSection::drawADSR(juce::Graphics& g, juce::Rectangle<float> area,
-                              float atk, float hld, float dcy, float sus, float rel,
-                              juce::Colour col)
+void FilterSection::drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<float> area)
 {
-    float sustain_width = 0.15f;  // fixed sustain display fraction of total
-    float total = atk + hld + dcy + sustain_width + rel;
-    if (total < 0.001f) return;
+    if (!pFilterType || !pFilterCutoff || !pFilterRes) return;
+    int type = static_cast<int>(pFilterType->load());
+    float cutoff = pFilterCutoff->load();
+    float res = pFilterRes->load();
 
-    float x0 = area.getX(), w = area.getWidth(), h = area.getHeight();
-    float yb = area.getBottom() - 1.0f;   // baseline
-    float yt = area.getY()     + 2.0f;    // peak
-    float ys = yt + (1.0f - juce::jlimit(0.0f, 1.0f, sus)) * (yb - yt);
+    float w = area.getWidth(), h = area.getHeight(), x0 = area.getX(), y0 = area.getY();
+    float bottom = y0 + h;
 
-    auto tx = [&](float t) { return x0 + (t / total) * w; };
+    // Map 20Hz-20kHz to 0..1 log scale
+    auto freqToX = [](float f) {
+        return (std::log10(std::max(20.0f, f)) - std::log10(20.0f)) / (std::log10(20000.0f) - std::log10(20.0f));
+    };
 
-    float t1 = atk;
-    float t2 = atk + hld;
-    float t3 = atk + hld + dcy;
-    float t4 = t3 + sustain_width;
-    float t5 = total;
+    float normCutoff = freqToX(cutoff);
+    float cx = x0 + normCutoff * w;
+    float peakY = bottom - h * 0.75f; // Flat top of passband
 
-    juce::Path path;
-    path.startNewSubPath(x0,     yb);
-    path.lineTo(tx(t1), yt);
-    path.lineTo(tx(t2), yt);
-    path.lineTo(tx(t3), ys);
-    path.lineTo(tx(t4), ys);
-    path.lineTo(tx(t5), yb);
+    juce::Path p;
+    const int pts = 64;
+    for (int i = 0; i <= pts; ++i)
+    {
+        float xNorm = static_cast<float>(i) / pts;
+        float px = x0 + xNorm * w;
+        float y = bottom;
+        float dist = xNorm - normCutoff;
+        
+        switch (type) {
+            case 0: // LP12
+            case 1: // LP24
+                if (xNorm < normCutoff) y = peakY;
+                else y = peakY + dist * h * (type == 1 ? 8.0f : 4.0f);
+                break;
+            case 2: // HP12
+            case 3: // HP24
+                if (xNorm > normCutoff) y = peakY;
+                else y = peakY - dist * h * (type == 3 ? 8.0f : 4.0f);
+                break;
+            case 4: // BP
+                y = peakY + std::abs(dist) * h * (4.0f + res * 6.0f);
+                break;
+            case 5: // Notch
+                y = peakY;
+                if (std::abs(dist) < 0.05f) y = bottom - std::abs(dist) * 20.0f * h;
+                break;
+            default: // Other
+                y = peakY + std::sin(xNorm * 30.0f) * h * 0.1f * res;
+                break;
+        }
+        
+        // Add resonant peak
+        if (type < 4) {
+            float peakW = 0.04f * (1.0f - res * 0.5f);
+            float peakInfluence = std::max(0.0f, 1.0f - std::abs(dist) / peakW);
+            y -= peakInfluence * h * res * 0.8f;
+        }
+        else if (type == 4) { // BP peak
+            y -= h * res * 0.5f;
+        }
 
-    // Gradient fill
-    juce::ColourGradient grad { col.withAlpha(0.18f), x0, yt, col.withAlpha(0.0f), x0, yb, false };
-    juce::Path fill = path;
-    fill.lineTo(tx(t5), yb);
-    fill.lineTo(x0,     yb);
+        y = juce::jlimit(y0, bottom, y);
+        if (i == 0) p.startNewSubPath(px, y);
+        else p.lineTo(px, y);
+    }
+
+    g.setColour(AMBER.withAlpha(0.15f));
+    juce::Path fill = p;
+    fill.lineTo(x0 + w, bottom);
+    fill.lineTo(x0, bottom);
     fill.closeSubPath();
-    g.setGradientFill(grad);
     g.fillPath(fill);
 
-    // Outer glow
-    g.setColour(col.withAlpha(0.2f));
-    g.strokePath(path, juce::PathStrokeType(3.0f));
-    // Main stroke
-    g.setColour(col.withAlpha(0.85f));
-    g.strokePath(path, juce::PathStrokeType(1.5f));
+    g.setColour(AMBER.withAlpha(0.85f));
+    g.strokePath(p, juce::PathStrokeType(1.5f));
 
-    // Stage tick marks
-    g.setColour(col.withAlpha(0.35f));
-    for (float tx_ : { tx(t1), tx(t2), tx(t3), tx(t4) })
-        g.drawVerticalLine(static_cast<int>(tx_), yt, yb);
+    // Draw cutoff vertical line
+    g.setColour(AMBER.withAlpha(0.4f));
+    g.drawVerticalLine(static_cast<int>(cx), y0, bottom);
 }
 
 // ── FilterSection ─────────────────────────────────────────────────────────────
@@ -119,13 +149,10 @@ FilterSection::FilterSection(VoidWaveAudioProcessor& p) : processor(p)
     sectionTitle.setColour(juce::Label::textColourId, AMBER);
     addAndMakeVisible(sectionTitle);
 
-    // ENV1 pointers for live ADSR viz
-    pEnv1Atk = t.getRawParameterValue("env1_attack");
-    pEnv1Dcy = t.getRawParameterValue("env1_decay");
-    pEnv1Sus = t.getRawParameterValue("env1_sustain");
-    pEnv1Hld = t.getRawParameterValue("env1_hold");
-    pEnv1Rel = t.getRawParameterValue("env1_release");
-    pEnv1Dep = t.getRawParameterValue("env1_depth");
+    // Filter pointers for live viz
+    pFilterType   = t.getRawParameterValue("filter_type");
+    pFilterCutoff = t.getRawParameterValue("filter_cutoff");
+    pFilterRes    = t.getRawParameterValue("filter_res");
 
     sCutoff  .setComponentID("filter_cutoff");
     sRes     .setComponentID("filter_res");
@@ -171,21 +198,7 @@ void FilterSection::paint(juce::Graphics& g)
     g.setColour(AMBER.withAlpha(0.04f));
     g.drawHorizontalLine(static_cast<int>(vizArea.getCentreY()), vizArea.getX()+2, vizArea.getRight()-2);
 
-    // Depth indicator — vertical dashed line showing ENV1 depth range
-    if (pEnv1Dep)
-    {
-        float dep  = pEnv1Dep->load();
-        float depH = vizArea.getHeight() * std::abs(dep) * 0.4f;
-        g.setColour(AMBER.withAlpha(0.15f));
-        g.fillRect(juce::Rectangle<float>(vizArea.getX(), vizArea.getCentreY() - depH,
-                                          3.0f, depH * 2.0f));
-    }
-
-    // Draw ENV1 ADSR curve
-    if (pEnv1Atk && pEnv1Dcy && pEnv1Sus && pEnv1Hld && pEnv1Rel)
-        drawADSR(g, vizArea.reduced(4, 4),
-                 pEnv1Atk->load(), pEnv1Hld->load(), pEnv1Dcy->load(),
-                 pEnv1Sus->load(), pEnv1Rel->load(), AMBER);
+    drawFrequencyResponse(g, vizArea.reduced(2, 2));
 
     juce::ignoreUnused(H);
 }

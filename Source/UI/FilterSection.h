@@ -25,20 +25,13 @@ private:
 
     juce::Label sectionTitle;
 
-    // ENV1 param pointers — for live ADSR visualisation
-    std::atomic<float>* pEnv1Atk  = nullptr;
-    std::atomic<float>* pEnv1Dcy  = nullptr;
-    std::atomic<float>* pEnv1Sus  = nullptr;
-    std::atomic<float>* pEnv1Hld  = nullptr;
-    std::atomic<float>* pEnv1Rel  = nullptr;
-    std::atomic<float>* pEnv1Dep  = nullptr;
+    std::atomic<float>* pFilterType = nullptr;
+    std::atomic<float>* pFilterCutoff = nullptr;
+    std::atomic<float>* pFilterRes = nullptr;
+
+    void drawFrequencyResponse(juce::Graphics& g, juce::Rectangle<float> area);
 
     void timerCallback() override { updateRouteButtons(); repaint(); }
-
-    // Draw ADSR shape (shared static helper used by Filter and Envelope)
-    static void drawADSR(juce::Graphics& g, juce::Rectangle<float> area,
-                         float atk, float hld, float dcy, float sus, float rel,
-                         juce::Colour col);
 
     using SlAtt = juce::AudioProcessorValueTreeState::SliderAttachment;
     using CbAtt = juce::AudioProcessorValueTreeState::ComboBoxAttachment;

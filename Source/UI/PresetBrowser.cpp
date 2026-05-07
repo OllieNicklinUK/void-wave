@@ -14,6 +14,43 @@ PresetBrowser::PresetBrowser(VoidWaveAudioProcessor& p) : processor(p)
     setInterceptsMouseClicks(true, true);
     addKeyListener(this);
     setWantsKeyboardFocus(true);
+    
+    addAndMakeVisible(newPresetBtn);
+    newPresetBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(VW::BG_RAISED));
+    newPresetBtn.setColour(juce::TextButton::textColourOffId, AMBER);
+    newPresetBtn.onClick = [this] {
+        processor.presetManager.loadInitPreset();
+        if (onClose) onClose();
+    };
+
+    addAndMakeVisible(exportAllBtn);
+    exportAllBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(VW::BG_RAISED));
+    exportAllBtn.setColour(juce::TextButton::textColourOffId, AMBER);
+    exportAllBtn.onClick = [this] {
+        fileChooser = std::make_unique<juce::FileChooser>("Export User Presets",
+                                                          juce::File::getSpecialLocation(juce::File::userDesktopDirectory),
+                                                          "");
+        auto folderFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectDirectories;
+        fileChooser->launchAsync(folderFlags, [this](const juce::FileChooser& fc)
+        {
+            juce::File targetDir = fc.getResult();
+            if (targetDir.isDirectory())
+            {
+                int count = 0;
+                auto& pm = processor.presetManager;
+                for (int i = 0; i < pm.getNumPresets(); ++i) {
+                    const auto& p = pm.getPreset(i);
+                    if (p.category == "USER" && p.file.existsAsFile()) {
+                        juce::File dest = targetDir.getChildFile(p.file.getFileName());
+                        if (p.file.copyFileTo(dest)) count++;
+                    }
+                }
+                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon, "Export Complete",
+                    "Exported " + juce::String(count) + " user presets.");
+            }
+        });
+    };
+
     refresh();
 }
 
@@ -68,9 +105,12 @@ void PresetBrowser::resized()
     int infoW  = 160;
     int patchW = pw - catW - infoW - COL_PAD * 4;
 
-    catCol   = { cx,                        cy, catW,   ch };
+    catCol   = { cx,                        cy, catW,   ch - 54 };
     patchCol = { cx + catW + COL_PAD,       cy, patchW, ch };
     infoCol  = { cx + catW + patchW + COL_PAD * 2, cy, infoW, ch };
+
+    newPresetBtn.setBounds(cx, cy + ch - 50, catW, 22);
+    exportAllBtn.setBounds(cx, cy + ch - 24, catW, 22);
 
     closeBtn = { panel.getRight() - 22, panel.getY() + 4, 16, 16 };
 }

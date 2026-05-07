@@ -46,9 +46,9 @@ LFOSection::LFOSection(VoidWaveAudioProcessor& p) : processor(p)
     iniKnob(sRate2,  lRate2);   iniKnob(sDepth2, lDepth2);
     iniKnob(sPhase2, lPhase2);  iniKnob(sFade2,  lFade2);
     iniKnob(sSyncDiv2, lSyncDiv2);
-    iniCombo(cShape1); iniCombo(cTrig1);
-    iniCombo(cShape2); iniCombo(cTrig2);
-    for (auto* l : {&lShape1,&lTrig1,&lShape2,&lTrig2})
+    iniCombo(cShape1); iniCombo(cTrig1); iniCombo(cTarget1);
+    iniCombo(cShape2); iniCombo(cTrig2); iniCombo(cTarget2);
+    for (auto* l : {&lShape1,&lTrig1,&lTarget1,&lShape2,&lTrig2,&lTarget2})
     {
         l->setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 8.0f, juce::Font::plain));
         l->setColour(juce::Label::textColourId, juce::Colour(VW::TEXT_MID));
@@ -68,8 +68,8 @@ LFOSection::LFOSection(VoidWaveAudioProcessor& p) : processor(p)
         if (auto* p = dynamic_cast<juce::AudioParameterChoice*>(t.getParameter(id)))
             c.addItemList(p->choices, 1);
     };
-    pop(cShape1, "lfo1_shape"); pop(cTrig1, "lfo1_trigger");
-    pop(cShape2, "lfo2_shape"); pop(cTrig2, "lfo2_trigger");
+    pop(cShape1, "lfo1_shape"); pop(cTrig1, "lfo1_trigger"); pop(cTarget1, "lfo1_target");
+    pop(cShape2, "lfo2_shape"); pop(cTrig2, "lfo2_trigger"); pop(cTarget2, "lfo2_target");
 
     aRate1  = std::make_unique<SlAtt>(t,"lfo1_rate",       sRate1);
     aDepth1 = std::make_unique<SlAtt>(t,"lfo1_depth",      sDepth1);
@@ -78,6 +78,7 @@ LFOSection::LFOSection(VoidWaveAudioProcessor& p) : processor(p)
     aDiv1   = std::make_unique<SlAtt>(t,"lfo1_sync_div",   sSyncDiv1);
     aShape1 = std::make_unique<CbAtt>(t,"lfo1_shape",      cShape1);
     aTrig1  = std::make_unique<CbAtt>(t,"lfo1_trigger",    cTrig1);
+    aTarget1= std::make_unique<CbAtt>(t,"lfo1_target",     cTarget1);
     aSync1  = std::make_unique<BtAtt>(t,"lfo1_tempo_sync", tSync1);
 
     aRate2  = std::make_unique<SlAtt>(t,"lfo2_rate",       sRate2);
@@ -87,6 +88,7 @@ LFOSection::LFOSection(VoidWaveAudioProcessor& p) : processor(p)
     aDiv2   = std::make_unique<SlAtt>(t,"lfo2_sync_div",   sSyncDiv2);
     aShape2 = std::make_unique<CbAtt>(t,"lfo2_shape",      cShape2);
     aTrig2  = std::make_unique<CbAtt>(t,"lfo2_trigger",    cTrig2);
+    aTarget2= std::make_unique<CbAtt>(t,"lfo2_target",     cTarget2);
     aSync2  = std::make_unique<BtAtt>(t,"lfo2_tempo_sync", tSync2);
 
     sectionTitle.setText("LFO", juce::dontSendNotification);
@@ -110,15 +112,27 @@ LFOSection::LFOSection(VoidWaveAudioProcessor& p) : processor(p)
     startTimerHz(30);
 }
 
+void LFOSection::timerCallback()
+{
+    lfoAnimPhase += 0.04f;
+    
+    bool s1 = tSync1.getToggleState();
+    sRate1.setVisible(!s1); lRate1.setVisible(!s1);
+    sSyncDiv1.setVisible(s1); lSyncDiv1.setVisible(s1);
+    
+    bool s2 = tSync2.getToggleState();
+    sRate2.setVisible(!s2); lRate2.setVisible(!s2);
+    sSyncDiv2.setVisible(s2); lSyncDiv2.setVisible(s2);
+
+    repaint();
+}
+
 void LFOSection::showLFO(int idx)
 {
     currentLFO = juce::jlimit(0, 1, idx);
     // Tabs only control which LFO is shown in the viz — both rows always visible
     for (int i = 0; i < 2; ++i)
         tabBtns[i].setToggleState(i == currentLFO, juce::dontSendNotification);
-    // DIV knobs always hidden
-    sSyncDiv1.setVisible(false); lSyncDiv1.setVisible(false);
-    sSyncDiv2.setVisible(false); lSyncDiv2.setVisible(false);
     repaint();
 }
 
@@ -180,11 +194,8 @@ void LFOSection::paint(juce::Graphics& g)
     // Animated LFO preview
     drawLFOPreview(g, juce::Rectangle<int>(pad, 17, W - 2*pad, 30));
 
-    // Routing hint
-    g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.0f, juce::Font::plain));
-    g.setColour(PURPLE.withAlpha(0.45f));
-    juce::String target = (currentLFO == 0) ? "-> WT POS" : "-> FILTER";
-    g.drawText(target, pad + 2, 48, W - 2*pad - 4, 9, juce::Justification::right);
+    // Routing hint (removed since we have a dedicated dropdown now, keeping spacing)
+    // g.drawText(target, pad + 2, 48, W - 2*pad - 4, 9, juce::Justification::right);
 
     // Row headers — LFO 1 fixed, LFO 2 shifted +10px
     g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.0f, juce::Font::bold));
@@ -206,10 +217,16 @@ void LFOSection::resized()
 
     // ── LFO 1 controls — unchanged position ──────────────────────────────
     {
-        int cw = (W - 3*pad) / 2;
-        lShape1.setBounds(pad,          87, cw, 10);       cShape1.setBounds(pad,          97, cw, 16);
-        lTrig1 .setBounds(pad+cw+pad,   87, cw-30, 10);    cTrig1 .setBounds(pad+cw+pad,   97, cw-32, 16);
-        tSync1 .setBounds(W-pad-28,     97, 28, 16);
+        int syncW = 28;
+        int cw = (W - 4*pad - syncW) / 3;
+        int x0 = pad;
+        lShape1.setBounds(x0, 87, cw, 10); cShape1.setBounds(x0, 97, cw, 16);
+        x0 += cw + pad;
+        lTrig1.setBounds(x0, 87, cw, 10); cTrig1.setBounds(x0, 97, cw, 16);
+        x0 += cw + pad;
+        lTarget1.setBounds(x0, 87, cw, 10); cTarget1.setBounds(x0, 97, cw, 16);
+        x0 += cw + pad;
+        tSync1.setBounds(W-pad-syncW, 97, syncW, 16);
 
         const int Km = 42, kw = (W-2*pad)/4;
         juce::Slider* ks[] = {&sRate1,&sDepth1,&sPhase1,&sFade1};
@@ -219,15 +236,25 @@ void LFOSection::resized()
             int x = pad + i*kw + (kw-Km)/2;
             ks[i]->setBounds(x, 117, Km, Km);
             ls[i]->setBounds(pad + i*kw, 117+Km+2, kw, 10);
+            if (i == 0) {
+                sSyncDiv1.setBounds(x, 117, Km, Km);
+                lSyncDiv1.setBounds(pad + i*kw, 117+Km+2, kw, 10);
+            }
         }
     }
 
     // ── LFO 2 controls (always visible) ──────────────────────────────────
     {
-        int cw = (W - 3*pad) / 2;
-        lShape2.setBounds(pad,          185, cw, 10);      cShape2.setBounds(pad,          195, cw, 16);
-        lTrig2 .setBounds(pad+cw+pad,   185, cw-30, 10);   cTrig2 .setBounds(pad+cw+pad,   195, cw-32, 16);
-        tSync2 .setBounds(W-pad-28,     195, 28, 16);
+        int syncW = 28;
+        int cw = (W - 4*pad - syncW) / 3;
+        int x0 = pad;
+        lShape2.setBounds(x0, 185, cw, 10); cShape2.setBounds(x0, 195, cw, 16);
+        x0 += cw + pad;
+        lTrig2.setBounds(x0, 185, cw, 10); cTrig2.setBounds(x0, 195, cw, 16);
+        x0 += cw + pad;
+        lTarget2.setBounds(x0, 185, cw, 10); cTarget2.setBounds(x0, 195, cw, 16);
+        x0 += cw + pad;
+        tSync2.setBounds(W-pad-syncW, 195, syncW, 16);
 
         const int Km = 42, kw = (W-2*pad)/4;
         juce::Slider* ks[] = {&sRate2,&sDepth2,&sPhase2,&sFade2};
@@ -237,6 +264,10 @@ void LFOSection::resized()
             int x = pad + i*kw + (kw-Km)/2;
             ks[i]->setBounds(x, 215, Km, Km);
             ls[i]->setBounds(pad + i*kw, 215+Km+2, kw, 10);
+            if (i == 0) {
+                sSyncDiv2.setBounds(x, 215, Km, Km);
+                lSyncDiv2.setBounds(pad + i*kw, 215+Km+2, kw, 10);
+            }
         }
     }
 }

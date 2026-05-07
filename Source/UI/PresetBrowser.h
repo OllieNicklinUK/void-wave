@@ -45,6 +45,10 @@ private:
     juce::Rectangle<int> infoCol;
     juce::Rectangle<int> closeBtn;
 
+    juce::TextButton newPresetBtn { "+ New Preset" };
+    juce::TextButton exportAllBtn { "Export User Presets" };
+    std::unique_ptr<juce::FileChooser> fileChooser;
+
     static constexpr int ROW_H    = 19;
     static constexpr int HDR_H    = 22;
     static constexpr int COL_PAD  = 6;

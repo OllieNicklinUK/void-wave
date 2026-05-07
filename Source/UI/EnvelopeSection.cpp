@@ -196,8 +196,8 @@ void EnvelopeSection::paint(juce::Graphics& g)
     // Row headers for always-visible knob rows
     g.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 7.0f, juce::Font::bold));
     g.setColour(GREEN.withAlpha(0.55f));
-    g.drawText("FILTER ENV", pad + 5, 138, 120, 9, juce::Justification::left);
-    g.drawText("AMP ENV",    pad + 5, 208, 120, 9, juce::Justification::left);
+    g.drawText("AMP ENV",    pad + 5, 138, 120, 9, juce::Justification::left);
+    g.drawText("FILTER ENV", pad + 5, 208, 120, 9, juce::Justification::left);
 }
 
 void EnvelopeSection::layoutEnv(int envIdx, juce::Rectangle<int> area)
@@ -244,13 +244,12 @@ void EnvelopeSection::resized()
     tabBtns[0].setBounds(pad,            118, tw, 14);
     tabBtns[1].setBounds(pad + tw + pad, 118, tw, 14);
 
-    // ── FILTER ENV knobs (row 1, 5 knobs — DEPTH moved to Filter panel) ───
+    // ── AMP ENV knobs (row 1) — always visible ────────────────────────────
     {
         const int Km = 42, numK = 5, y = 150;
-        sDep1.setVisible(false); lDep1.setVisible(false);   // lives in FilterSection now
         int kw = (W - 2*pad) / numK;
-        juce::Slider* ks[] = { &sAtk1,&sDcy1,&sSus1,&sHld1,&sRel1 };
-        juce::Label*  ls[] = { &lAtk1,&lDcy1,&lSus1,&lHld1,&lRel1 };
+        juce::Slider* ks[] = { &sAtk2,&sDcy2,&sSus2,&sHld2,&sRel2 };
+        juce::Label*  ls[] = { &lAtk2,&lDcy2,&lSus2,&lHld2,&lRel2 };
         for (int i = 0; i < numK; ++i)
         {
             int x = pad + i*kw + (kw-Km)/2;
@@ -259,12 +258,13 @@ void EnvelopeSection::resized()
         }
     }
 
-    // ── AMP ENV knobs (row 2) — always visible ────────────────────────────
+    // ── FILTER ENV knobs (row 2, 5 knobs — DEPTH moved to Filter panel) ───
     {
         const int Km = 42, numK = 5, y = 220;
+        sDep1.setVisible(false); lDep1.setVisible(false);   // lives in FilterSection now
         int kw = (W - 2*pad) / numK;
-        juce::Slider* ks[] = { &sAtk2,&sDcy2,&sSus2,&sHld2,&sRel2 };
-        juce::Label*  ls[] = { &lAtk2,&lDcy2,&lSus2,&lHld2,&lRel2 };
+        juce::Slider* ks[] = { &sAtk1,&sDcy1,&sSus1,&sHld1,&sRel1 };
+        juce::Label*  ls[] = { &lAtk1,&lDcy1,&lSus1,&lHld1,&lRel1 };
         for (int i = 0; i < numK; ++i)
         {
             int x = pad + i*kw + (kw-Km)/2;

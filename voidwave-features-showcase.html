@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoidWave VST Synthesizer · Feature Specifications</title>
+    <meta name="description" content="Explore the full functionality and feature set of the VoidWave VST Synthesizer.">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-void: #000000;
+            --bg-deep: #050508;
+            --bg-panel: #0a0b10;
+            --bg-raised: #111318;
+            --bg-elevated: #1e2235;
+
+            --neon-amber: #f5a623;
+            --neon-cyan: #00d4ff;
+            --neon-violet: #9b5fe0;
+            --neon-green: #00ff88;
+            --neon-red: #ff3355;
+
+            --border-subtle: #1c2030;
+            --border-glow: #2a3050;
+            --text-bright: #e8edf8;
+            --text-mid: #7a8099;
+            --text-dim: #3a3f55;
+
+            --glow-amber: rgba(245,166,35,0.35);
+            --glow-cyan: rgba(0,212,255,0.30);
+            --glow-violet: rgba(155,95,224,0.28);
+            --glow-green: rgba(0,255,136,0.30);
+            --glow-red: rgba(255,51,85,0.30);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-bright);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 30%, var(--glow-cyan), transparent 35%),
+                radial-gradient(circle at 80% 70%, var(--glow-violet), transparent 28%),
+                linear-gradient(rgba(0,0,0,0.12) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 100% 2px;
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 70px;
+            padding: 40px 0;
+            position: relative;
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 56px;
+            font-weight: 900;
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-violet));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 25px var(--glow-cyan);
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-mid);
+            font-size: 14px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 30px;
+        }
+
+        .panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-subtle);
+            border-top: 2px solid var(--accent-color, var(--neon-cyan));
+            position: relative;
+            padding: 30px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(to bottom, var(--accent-glow, var(--glow-cyan)), transparent);
+            pointer-events: none;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 15px 40px rgba(0,0,0,0.7), 0 0 20px var(--accent-glow);
+            border-color: var(--border-glow);
+        }
+
+        .panel-header {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent-color, var(--neon-cyan));
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        .panel-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+            margin-left: 20px;
+        }
+
+        .feature-list {
+            list-style: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .feature-list li {
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            color: var(--text-bright);
+        }
+
+        .feature-title-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .feature-title-row::before {
+            content: '>';
+            color: var(--accent-color, var(--neon-cyan));
+            margin-right: 12px;
+            font-weight: bold;
+        }
+
+        .feature-label {
+            color: var(--text-mid);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .feature-desc {
+            padding-left: 21px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* Specific panel accents */
+        .panel.osc { --accent-color: var(--neon-cyan); --accent-glow: var(--glow-cyan); }
+        .panel.sub { --accent-color: var(--neon-cyan); --accent-glow: var(--glow-cyan); }
+        .panel.filter { --accent-color: var(--neon-red); --accent-glow: var(--glow-red); }
+        .panel.mod { --accent-color: var(--neon-violet); --accent-glow: var(--glow-violet); }
+        .panel.matrix { --accent-color: var(--neon-green); --accent-glow: var(--glow-green); }
+        .panel.fx { --accent-color: var(--neon-amber); --accent-glow: var(--glow-amber); }
+        .panel.global { --accent-color: var(--text-bright); --accent-glow: rgba(232,237,248,0.2); }
+
+        .highlight {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .val-badge {
+            background: var(--bg-raised);
+            border: 1px solid var(--border-subtle);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: var(--accent-color);
+            margin-right: 6px;
+            white-space: nowrap;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+        
+        .badge-container {
+            margin-top: 6px;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1 class="logo">VoidWave VST</h1>
+        <div class="subtitle">Complete Core Architecture & Specifications</div>
+    </header>
+
+    <div class="grid">
+        <!-- Oscillators & Engine -->
+        <div class="panel osc">
+            <div class="panel-header">Wavetable Engine</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Dual Wavetable Oscillators</span></div>
+                    <div class="feature-desc">Two independent primary oscillators with User Wavetable Import and precision Phase Modes (Free, Fixed, Random).</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Single</span>
+                        <span class="val-badge">Morph</span>
+                        <span class="val-badge">Scan</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Unison Engine</span></div>
+                    <div class="feature-desc">Massive stereo spread with per-oscillator Unison voices and Detune control.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">1, 2, 3, 4, 6, 8 Voices</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Mix & Synthesis Modes</span></div>
+                    <div class="feature-desc">Advanced interaction between oscillators with fully routable Pitch Envelopes and Stereo Width control.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Blend</span>
+                        <span class="val-badge">Ring Mod</span>
+                        <span class="val-badge">Hard Sync</span>
+                        <span class="val-badge">Linear FM</span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Sub & Noise Generator -->
+        <div class="panel sub">
+            <div class="panel-header">Sub & Noise Generator</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Sub Oscillator</span></div>
+                    <div class="feature-desc">Dedicated sub-oscillator to reinforce the low-end, featuring selectable Octave dropping and independent level controls.</div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Noise Generator</span></div>
+                    <div class="feature-desc">Integrated noise source with variable Color control, perfect for designing percussion, sweeps, and atmospheric textures.</div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Filter -->
+        <div class="panel filter">
+            <div class="panel-header">Multimode Filter</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">8 Filter Topologies</span></div>
+                    <div class="feature-desc">High-quality modeled filters with self-oscillating resonance.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">LP12 / LP24</span>
+                        <span class="val-badge">HP12 / HP24</span>
+                        <span class="val-badge">Bandpass</span>
+                        <span class="val-badge">Notch</span>
+                        <span class="val-badge">Comb</span>
+                        <span class="val-badge">Formant</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Analog Drive</span></div>
+                    <div class="feature-desc">Built-in saturation and drive staging placed right within the filter circuit for authentic grit.</div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Advanced Tracking</span></div>
+                    <div class="feature-desc">Flexible filter routing capabilities, supported by precise Keyboard Tracking and Velocity Tracking parameters.</div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Envelopes & LFOs -->
+        <div class="panel mod">
+            <div class="panel-header">Modulators</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">3x DAHDSR Envelopes</span></div>
+                    <div class="feature-desc">Delay, Attack, Hold, Decay, Sustain, Release. Complete with looping capability and Velocity Sensitivity.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Linear</span>
+                        <span class="val-badge">Exponential</span>
+                        <span class="val-badge">Logarithmic</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">2x Advanced LFOs</span></div>
+                    <div class="feature-desc">Tempo-syncable LFOs with Fade-In, Phase Offset, and multiple trigger behaviors (Free, Retrig, One Shot).</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Sine</span>
+                        <span class="val-badge">Triangle</span>
+                        <span class="val-badge">Saw / Ramp</span>
+                        <span class="val-badge">Square</span>
+                        <span class="val-badge">S&H</span>
+                        <span class="val-badge">Smooth Rand</span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Effects Chain -->
+        <div class="panel fx">
+            <div class="panel-header">Quad Effects Chain</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Distortion Unit</span></div>
+                    <div class="feature-desc">Multi-algorithm distortion.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Soft Clip</span>
+                        <span class="val-badge">Hard Clip</span>
+                        <span class="val-badge">Tube Sat</span>
+                        <span class="val-badge">Foldback</span>
+                        <span class="val-badge">Bitcrusher</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Modulation FX</span></div>
+                    <div class="feature-desc">Lush spatial effects.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Chorus</span>
+                        <span class="val-badge">Ensemble</span>
+                        <span class="val-badge">Flanger</span>
+                        <span class="val-badge">Phaser</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Delay Unit</span></div>
+                    <div class="feature-desc">Tempo-synced echoes with crossfeed.</div>
+                    <div class="feature-desc badge-container">
+                        <span class="val-badge">Mono</span>
+                        <span class="val-badge">Ping-Pong</span>
+                        <span class="val-badge">Stereo</span>
+                    </div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Reverb Engine</span></div>
+                    <div class="feature-desc">High-density algorithmic reverb capable of infinite decay and massive cinematic spaces.</div>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Global & Matrix -->
+        <div class="panel matrix">
+            <div class="panel-header">Mod Matrix & Global</div>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">12-Slot Mod Matrix</span></div>
+                    <div class="feature-desc">Freely assignable matrix connecting 20+ sources (Envelopes, LFOs, Macros, MIDI Data) to any synth parameter.</div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Performance Macros</span></div>
+                    <div class="feature-desc">4 Assignable Macro knobs for instantaneous live parameter morphing.</div>
+                </li>
+                <li>
+                    <div class="feature-title-row"><span class="feature-label">Voice & MIDI Features</span></div>
+                    <div class="feature-desc">8-Voice Polyphony, Legato & Always Glide modes, adjustable Pitch Bend range, and comprehensive MIDI Learn system for hardware mapping.</div>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

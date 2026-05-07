@@ -24,6 +24,7 @@ public:
     int                getCurrentIndex()  const { return currentIndex; }
 
     bool loadPreset(int index);
+    void loadInitPreset();
     bool savePreset(const juce::String& name, const juce::String& category);
     bool savePresetToDisk(const juce::String& name, const juce::File& file);
 

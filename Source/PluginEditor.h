@@ -41,6 +41,7 @@ private:
     juce::TextButton prevBtn { "<" }, nextBtn { ">" };
     juce::TextButton presetNameBtn;          // shows current preset, click to open browser
     juce::TextButton importBtn { "IMPORT" };
+    juce::TextButton modMatrixBtn { "MATRIX" };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     // Three-column browser (shown as overlay)

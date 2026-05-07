@@ -306,9 +306,37 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
         v.osc1.setFrequency(osc1Hz);
         v.osc2.setFrequency(osc2Hz);
 
-        // ── Advance LFOs by full block (phaseInc is per-sample) ──────────
+        // ── Advance LFOs by full block ──────────
+        // LFO rate cross-modulation
+        float lfo1ModRate = lastParams.lfo1Rate;
+        float lfo2ModRate = lastParams.lfo2Rate;
+        // Apply block-delayed cross-mod for LFO2->LFO1 rate (using last lfo2 output) to prevent circular dependency
+        if (lastParams.lfo2Target == 4) lfo1ModRate *= std::pow(2.0f, v.modValues.sources[int(ModSource::LFO2)] * 2.0f);
+        v.lfo1.setRate(lfo1ModRate);
         float lfo1Val = v.lfo1.processBlock(n) * lastParams.lfo1Depth;
+
+        if (lastParams.lfo1Target == 4) lfo2ModRate *= std::pow(2.0f, lfo1Val * 2.0f);
+        v.lfo2.setRate(lfo2ModRate);
         float lfo2Val = v.lfo2.processBlock(n) * lastParams.lfo2Depth;
+
+        // Accumulate targets
+        float lfoWtPos = 0.0f;
+        float lfoBlend = 0.0f;
+        float lfoCutoff = 0.0f;
+        float lfoFilterEnvDep = 0.0f;
+        float lfoAmpEnvAtk = 0.0f;
+
+        auto applyLfoTarget = [&](int target, float val) {
+            if (target == 1) lfoWtPos += val;
+            else if (target == 2) lfoBlend += val;
+            else if (target == 3) lfoCutoff += val;
+            // 4 is Other LFO Rate, already handled
+            else if (target == 5) lfoFilterEnvDep += val;
+            else if (target == 6) lfoAmpEnvAtk += val;
+        };
+        applyLfoTarget(lastParams.lfo1Target, lfo1Val);
+        applyLfoTarget(lastParams.lfo2Target, lfo2Val);
+
         float env3Val = v.env3.getNextSample();
 
         // ── Populate mod sources ─────────────────────────────────────────
@@ -339,10 +367,10 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
 
         v.osc1.setPosition(juce::jlimit(0.f, 1.f,
             lastParams.osc1Position + dst[int(ModDest::OSC1_WT_POS)]
-            + lfo1Val * 0.5f + v.wtDriftPos));
+            + lfoWtPos * 0.5f + v.wtDriftPos));
         v.osc2.setPosition(juce::jlimit(0.f, 1.f,
             lastParams.osc2Position + dst[int(ModDest::OSC2_WT_POS)]
-            + lfo1Val * 0.5f + v.wtDriftPos));
+            + lfoWtPos * 0.5f + v.wtDriftPos));
 
         // Pitch mod (additive semitones from mod matrix — uses drift-applied freqs)
         if (std::abs(dst[int(ModDest::OSC1_PITCH)]) > 0.001f)
@@ -372,8 +400,8 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
         const int filterRoute = lastParams.filterRoute;
         v.osc1.process(v.tmpL.data(), v.tmpR.data(), n);
 
-        float oscMix = juce::jlimit(0.f, 1.f, lastParams.oscMix);
-        if (oscMix > 0.001f || filterRoute == 2)
+        float modOscMix = juce::jlimit(0.f, 1.f, lastParams.oscMix + lfoBlend);
+        if (modOscMix > 0.001f || filterRoute == 2)
         {
             v.osc2.process(v.tmpL2.data(), v.tmpR2.data(), n);
 
@@ -392,8 +420,8 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
                     default: // Blend (0), Sync/FM fall back to blend until implemented
                         for (int s = 0; s < n; ++s)
                         {
-                            v.tmpL[s] = v.tmpL[s] * (1.f - oscMix) + v.tmpL2[s] * oscMix;
-                            v.tmpR[s] = v.tmpR[s] * (1.f - oscMix) + v.tmpR2[s] * oscMix;
+                            v.tmpL[s] = v.tmpL[s] * (1.f - modOscMix) + v.tmpL2[s] * modOscMix;
+                            v.tmpR[s] = v.tmpR[s] * (1.f - modOscMix) + v.tmpR2[s] * modOscMix;
                         }
                         break;
                 }
@@ -425,9 +453,16 @@ void VoiceManager::process(juce::AudioBuffer<float>& buffer)
             src[int(ModSource::ENV1)] = env1Val;
             src[int(ModSource::ENV2)] = env2Val;
 
+            // Modulate filter depth and amp env attack if assigned
+            float curEnv1Depth = juce::jlimit(-1.0f, 1.0f, lastParams.env1Depth + lfoFilterEnvDep);
+            if (std::abs(lfoAmpEnvAtk) > 0.001f) {
+                float modAttack = juce::jlimit(0.001f, 10.0f, lastParams.env2Attack * std::pow(2.0f, lfoAmpEnvAtk * 2.0f));
+                v.env2.setAttack(modAttack);
+            }
+
             float cutoff = baseCutoff
-                + env1Val * lastParams.env1Depth * (baseCutoff - 20.f)
-                + lfo2Val * 4000.f;
+                + env1Val * curEnv1Depth * (baseCutoff - 20.f)
+                + lfoCutoff * 4000.f;
             cutoff = juce::jlimit(20.f, 20000.f, cutoff);
 
             v.filterL.setCutoff(cutoff);
